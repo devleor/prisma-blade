@@ -9,14 +9,38 @@ public partial class Fx : Node2D
     struct Spark { public Vector2 Pos, Vel; public float Life, Max; public Color Col; }
     struct RingFx { public Vector2 Pos; public float R0, R1, Life, Max, Width; public Color Col; }
     struct Text { public Vector2 Pos; public string S; public float Life; public Color Col; public int Size; }
+    struct PuffFx { public Vector2 Pos, Vel; public float Rot, Scale, Life, Max; public Color Col; public int Tex; }
 
     readonly List<Shard> shards = [];
     readonly List<Spark> sparks = [];
     readonly List<RingFx> rings = [];
     readonly List<Text> texts = [];
+    readonly List<PuffFx> puffs = [];
+    readonly Texture2D?[] puffTex =
+    [
+        Load("res://assets/textures/particles/dust_puff.png"), Load("res://assets/textures/particles/dust_puff2.png"),
+    ];
+
+    static Texture2D? Load(string path) => ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
     readonly RandomNumberGenerator rng = new();
 
-    public int Count => shards.Count + sparks.Count + rings.Count + texts.Count;
+    public int Count => shards.Count + sparks.Count + rings.Count + texts.Count + puffs.Count;
+
+    /// <summary>Dust clouds (CC0 smoke sprites tinted): wall hits, bowling, dash starts.</summary>
+    public void Puff(Vector2 pos, Color col, float scale, int n)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            float life = rng.RandfRange(0.4f, 0.7f);
+            puffs.Add(new PuffFx
+            {
+                Pos = pos + new Vector2(rng.RandfRange(-8, 8), rng.RandfRange(-8, 8)),
+                Vel = Vector2.FromAngle(rng.RandfRange(0, Mathf.Tau)) * rng.RandfRange(30, 110),
+                Rot = rng.RandfRange(0, Mathf.Tau), Scale = scale * rng.RandfRange(0.7f, 1.2f),
+                Life = life, Max = life, Col = col, Tex = rng.RandiRange(0, puffTex.Length - 1),
+            });
+        }
+    }
 
     public void Shards(Vector2 pos, Color col, int n, float speed, float size)
     {
@@ -72,6 +96,14 @@ public partial class Fx : Node2D
             if (r.Life <= 0) { rings.RemoveAt(i); continue; }
             rings[i] = r;
         }
+        for (int i = puffs.Count - 1; i >= 0; i--)
+        {
+            var p = puffs[i];
+            p.Life -= dt;
+            if (p.Life <= 0) { puffs.RemoveAt(i); continue; }
+            p.Pos += p.Vel * dt; p.Vel *= Mathf.Max(0, 1 - 3f * dt); p.Rot += dt;
+            puffs[i] = p;
+        }
         for (int i = texts.Count - 1; i >= 0; i--)
         {
             var t = texts[i];
@@ -85,6 +117,17 @@ public partial class Fx : Node2D
 
     public override void _Draw()
     {
+        foreach (var p in puffs)
+        {
+            var tex = puffTex[p.Tex];
+            if (tex == null) continue;
+            float k = 1 - p.Life / p.Max;
+            var c = p.Col; c.A *= 1 - k;
+            float s = p.Scale * (0.6f + 0.8f * k);
+            DrawSetTransform(p.Pos, p.Rot, new Vector2(s, s));
+            DrawTexture(tex, -tex.GetSize() / 2, c);
+        }
+        DrawSetTransform(Vector2.Zero, 0, Vector2.One);
         foreach (var r in rings)
         {
             float k = 1 - r.Life / r.Max, e = 1 - (1 - k) * (1 - k);

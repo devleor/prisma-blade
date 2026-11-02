@@ -28,6 +28,7 @@ public sealed partial class World
     public Enemy Spawn(EKind kind, Vector2 pos)
     {
         var e = Enemy.Make(kind, Tune.Clamp(pos, 40f), nextId++);
+        e.Pos = Collide(e.Pos, e.Radius, out _);
         e.StrafeSign = Rng.F() < 0.5f ? -1f : 1f;
         Enemies.Add(e);
         return e;
@@ -60,6 +61,7 @@ public sealed partial class World
         Phase = Phase.Intermission;
         PhaseT = 120;
         Player.Hp = Math.Min(Player.MaxHp, Player.Hp + 25);
+        Player.Recover = Math.Min(Player.Recover, Player.MaxHp - Player.Hp);
         Emit(Ev.WaveClear, Player.Pos, 0f, Wave);
     }
 
@@ -67,8 +69,8 @@ public sealed partial class World
     {
         for (int i = 0; i < 20; i++)
         {
-            var pos = Player.Pos + Tune.Dir(Rng.Range(0f, MathF.Tau)) * Rng.Range(360f, 520f);
-            if (MathF.Abs(pos.X) < Tune.HalfW - 50f && MathF.Abs(pos.Y) < Tune.HalfH - 50f) return pos;
+            var pos = Player.Pos + Tune.Dir(Rng.Range(0f, MathF.Tau)) * Rng.Range(260f, 420f);
+            if (MathF.Abs(pos.X) < Tune.HalfW - 50f && MathF.Abs(pos.Y) < Tune.HalfH - 50f && !InsidePillar(pos, 60f)) return pos;
         }
         return new Vector2(-Player.Pos.X, -Player.Pos.Y * 0.5f);
     }
@@ -109,7 +111,9 @@ public sealed partial class World
                 break;
         }
 
-        e.Pos = Tune.Clamp(e.Pos + e.Vel * dt, e.Radius);
+        if (e.WallCd > 0f) e.WallCd -= ts;
+        if (e.BowlCd > 0f) e.BowlCd -= ts;
+        MoveEnemy(e, dt);
     }
 
     static void Go(Enemy e, EState s) { e.State = s; e.T = 0f; }
@@ -284,7 +288,8 @@ public sealed partial class World
             float s = pr.Friendly ? 1f : ts;
             pr.Pos += pr.Vel * Tune.Dt * s;
             pr.Life -= Tune.Dt * s;
-            bool gone = pr.Life <= 0f || MathF.Abs(pr.Pos.X) > Tune.HalfW || MathF.Abs(pr.Pos.Y) > Tune.HalfH;
+            bool gone = pr.Life <= 0f || MathF.Abs(pr.Pos.X) > Tune.HalfW || MathF.Abs(pr.Pos.Y) > Tune.HalfH
+                || InsidePillar(pr.Pos, pr.Radius); // stone stops shots, reflected ones too
             if (!gone && pr.Friendly)
             {
                 foreach (var e in Enemies)
@@ -306,6 +311,20 @@ public sealed partial class World
         }
     }
 
+    /// <summary>A body thrown fast enough knocks over whoever it runs into, which can carry on down the line.</summary>
+    void Bowl(Enemy thrown, Enemy other)
+    {
+        if (thrown.State != EState.Stun || other.BowlCd > 0f || !other.Hittable || !thrown.Alive) return;
+        float speed = thrown.Vel.Length();
+        if (speed < Tune.BowlSpeed) return;
+        other.BowlCd = 30f;
+        thrown.BowlCd = MathF.Max(thrown.BowlCd, 10f);
+        Damage(other, 8, Tune.Norm(other.Pos - thrown.Pos), speed * 0.75f, 12f, 26f);
+        thrown.Vel *= 0.6f;
+        Hitstop = Math.Max(Hitstop, 3);
+        Emit(Ev.Bowl, (thrown.Pos + other.Pos) * 0.5f, speed);
+    }
+
     /// <summary>Bodies push apart. The player passes through enemies while dashing.</summary>
     void Separate()
     {
@@ -318,6 +337,7 @@ public sealed partial class World
                 var d = b.Pos - a.Pos;
                 float min = a.Radius + b.Radius, len = d.Length();
                 if (len >= min || len < 1e-3f) continue;
+                Bowl(a, b); Bowl(b, a);
                 var push = d / len * (min - len) * 0.5f;
                 a.Pos -= push; b.Pos += push;
             }
@@ -325,7 +345,8 @@ public sealed partial class World
             if (p.State == PState.Dash || !p.Alive || a.State == EState.Spawn) continue;
             var dp = p.Pos - a.Pos;
             float m = a.Radius + Tune.PlayerRadius, l = dp.Length();
-            if (l < m && l > 1e-3f) p.Pos = Tune.Clamp(a.Pos + dp / l * m, Tune.PlayerRadius);
+            if (l < m && l > 1e-3f) p.Pos = Collide(a.Pos + dp / l * m, Tune.PlayerRadius, out _);
         }
+        foreach (var e in Enemies) e.Pos = Collide(e.Pos, e.Radius, out _); // crowd pushing must not shove into stone
     }
 }

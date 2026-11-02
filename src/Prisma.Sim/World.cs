@@ -16,10 +16,13 @@ public sealed partial class World
     public readonly Rng Rng;
 
     public int Frame, Hitstop, SlowMo;
+    /// <summary>Hits dealt without a pause longer than ComboDrop frames or taking damage.</summary>
+    public int Combo, ComboT, BestCombo;
     int nextId, swingCounter, castCounter;
 
-    public World(uint seed = 7, bool waves = true)
+    public World(uint seed = 7, bool waves = true, bool pillars = true)
     {
+        if (pillars) Pillars.AddRange(PillarLayout);
         Rng = new Rng(seed);
         Player.Pos = new Vector2(0f, 120f);
         Player.Facing = -MathF.PI / 2f;
@@ -40,6 +43,7 @@ public sealed partial class World
         if (SlowMo > 0) { SlowMo--; ts = Tune.SlowTimeScale; }
 
         StepPlayer(inp);
+        if (Combo > 0 && ++ComboT > Tune.ComboDrop) Combo = 0;
         StepBursts();
         foreach (var e in Enemies.ToArray()) StepEnemy(e, ts);
         Separate();
@@ -58,6 +62,7 @@ public sealed partial class World
         if (inp.Light) Buffer(Buffered.Light);
         if (heavyPressed) Buffer(Buffered.Heavy);
         if (inp.Shatter) Buffer(Buffered.Shatter);
+        if (inp.Special) Buffer(Buffered.Special);
         if (inp.Dash) Buffer(Buffered.Dash); // dash wins a same-frame tie: escaping matters most
     }
 
@@ -71,6 +76,7 @@ public sealed partial class World
         if (p.BufferT > 0 && --p.BufferT == 0) p.Buffer = Buffered.None;
         if (p.Invuln > 0) p.Invuln--;
         if (p.DashCd > 0) p.DashCd--;
+        if (p.SpinCd > 0) p.SpinCd--;
         if (p.ComboTimer > 0) p.ComboTimer--;
         p.BladeActive = false;
 
@@ -118,7 +124,7 @@ public sealed partial class World
                 break;
         }
 
-        p.Pos = Tune.Clamp(p.Pos + p.Vel * Tune.Dt, Tune.PlayerRadius);
+        MovePlayer();
     }
 
     void Steer(Vector2 move, float mul)
@@ -138,6 +144,14 @@ public sealed partial class World
         {
             case Buffered.Dash when p.DashCd == 0:
                 StartDash(move);
+                return true;
+            case Buffered.Special when p.Hp > Moves.SpinCost && p.SpinCd == 0 && !(fromRecovery && p.Combo == Moves.SpinIndex && p.HeavySwing):
+                Consume();
+                p.SpinCd = Moves.SpinCooldown;
+                p.Hp -= Moves.SpinCost;
+                p.Recover += Moves.SpinCost;
+                StartSwing(Moves.Spin, heavy: true, combo: Moves.SpinIndex, aim);
+                p.Invuln = Math.Max(p.Invuln, Moves.Spin.Windup + Moves.Spin.Active + 2);
                 return true;
             case Buffered.Shatter when p.Focus >= Tune.ShatterCost:
                 Consume();
@@ -188,7 +202,7 @@ public sealed partial class World
         {
             p.SwingId = ++swingCounter;
             p.Vel = Tune.Dir(p.Facing) * s.Lunge + move * Tune.MoveSpeed * Tune.AttackSteer;
-            Emit(Ev.Swing, p.Pos, p.Facing, p.HeavySwing ? 3 : p.Combo);
+            Emit(Ev.Swing, p.Pos, p.Facing, p.HeavySwing ? (p.Combo == Moves.SpinIndex ? Moves.SpinIndex : 3) : p.Combo);
         }
 
         if (p.T <= activeEnd)
@@ -277,9 +291,10 @@ public sealed partial class World
     }
 
     /// <summary>Damage, poise and knockback for any source. Armoured enemies only flinch once their poise breaks.</summary>
-    void Damage(Enemy e, int dmg, Vector2 dir, float knock, float poiseDmg, float stun)
+    void Damage(Enemy e, int dmg, Vector2 dir, float knock, float poiseDmg, float stun, bool byPlayer = true)
     {
         e.Hp -= dmg;
+        if (byPlayer) CreditHit();
         e.Flash = 6f;
         bool armoured = false;
         if (e.MaxPoise > 0f)
@@ -293,6 +308,18 @@ public sealed partial class World
         e.Vel += dir * knock * (armoured ? 0.12f : 1f) * scale;
         if (!armoured) { e.State = EState.Stun; e.T = 0f; e.StunLen = stun; }
         if (e.Hp <= 0) Kill(e);
+    }
+
+    /// <summary>A hit the player made happen: grows the combo and wins back spin health.</summary>
+    void CreditHit()
+    {
+        Combo++; ComboT = 0; BestCombo = Math.Max(BestCombo, Combo);
+        if (Player.Recover > 0 && Player.Alive)
+        {
+            int back = Math.Min(Tune.RecoverPerHit, Player.Recover);
+            Player.Recover -= back;
+            Player.Hp = Math.Min(Player.MaxHp, Player.Hp + back);
+        }
     }
 
     void Kill(Enemy e)
@@ -380,6 +407,8 @@ public sealed partial class World
         }
         if (p.Invulnerable) return;
         p.Hp -= dmg;
+        p.Recover = 0;
+        Combo = 0;
         p.Invuln = Tune.HurtInvuln;
         p.Vel = Tune.Norm(p.Pos - from) * 420f;
         p.ComboTimer = 0;

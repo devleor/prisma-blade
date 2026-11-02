@@ -7,9 +7,9 @@ public static class Controls
 {
     public const string Left = "move_left", Right = "move_right", Up = "move_up", Down = "move_down";
     public const string AimLeft = "aim_left", AimRight = "aim_right", AimUp = "aim_up", AimDown = "aim_down";
-    public const string Light = "attack_light", Heavy = "attack_heavy", Dash = "dash", Shatter = "shatter", Restart = "restart";
+    public const string Light = "attack_light", Heavy = "attack_heavy", Dash = "dash", Shatter = "shatter", Special = "special", Restart = "restart";
 
-    public static readonly string[] All = [Left, Right, Up, Down, AimLeft, AimRight, AimUp, AimDown, Light, Heavy, Dash, Shatter, Restart];
+    public static readonly string[] All = [Left, Right, Up, Down, AimLeft, AimRight, AimUp, AimDown, Light, Heavy, Dash, Shatter, Special, Restart];
 
     static bool registered;
 
@@ -29,6 +29,7 @@ public static class Controls
         Add(Heavy, Key.K); Mouse(Heavy, MouseButton.Right); Pad(Heavy, JoyButton.Y);
         Add(Dash, Key.Space, Key.Shift); Pad(Dash, JoyButton.A); Pad(Dash, JoyButton.RightShoulder);
         Add(Shatter, Key.Q, Key.E, Key.L); Pad(Shatter, JoyButton.B); Axis(Shatter, JoyAxis.TriggerRight, 1);
+        Add(Special, Key.F); Mouse(Special, MouseButton.Middle); Pad(Special, JoyButton.LeftShoulder);
         Add(Restart, Key.R, Key.Enter); Pad(Restart, JoyButton.Start);
     }
 

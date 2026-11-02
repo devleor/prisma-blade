@@ -72,6 +72,16 @@ public partial class GameCheck : Node
                 Check(main.EventCounts.GetValueOrDefault(Ev.ChargeFull) == 1, "full charge is signalled");
                 Check(main.EventCounts.GetValueOrDefault(Ev.Swing) == 2, "releasing attack_heavy swings the heavy");
                 Check(main.Hud.Size.X > 0, "HUD fills the screen");
+                var seen = main.GetViewportRect().Size / main.Camera.Zoom;
+                Check(main.Camera.Zoom.X > 0.5f && seen.X >= Tune.HalfW * 2 + 60 && seen.Y >= Tune.HalfH * 2 + 60,
+                    $"the camera shows the whole arena and its walls ({seen.X:0}x{seen.Y:0} of {Tune.HalfW * 2:0}x{Tune.HalfH * 2:0})");
+                Check(main.World.Pillars.Count == World.PillarLayout.Length, "the stone pillars are in the arena");
+                Input.ActionPress(Controls.Special);
+                break;
+            case 231: Input.ActionRelease(Controls.Special); break;
+            case 262:
+                Check(main.EventCounts.GetValueOrDefault(Ev.Swing) == 3, "the special action spins");
+                Check(main.World.Player.Hp + main.World.Player.Recover == main.World.Player.MaxHp, "its cost is shown as recoverable health");
                 GD.Print(failures == 0 ? "PASSED" : $"FAILED ({failures})");
                 GetTree().Quit(failures == 0 ? 0 : 1);
                 break;

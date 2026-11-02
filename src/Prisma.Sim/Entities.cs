@@ -6,12 +6,12 @@ namespace Prisma.Sim;
 public struct Inputs
 {
     public Vector2 Move, Aim;
-    public bool Light, HeavyHeld, Dash, Shatter;
+    public bool Light, HeavyHeld, Dash, Shatter, Special;
 }
 
 public enum PState { Free, Attack, Charge, Dash, Hurt, Dead }
 
-public enum Buffered { None, Light, Heavy, Dash, Shatter }
+public enum Buffered { None, Light, Heavy, Dash, Shatter, Special }
 
 public sealed class Player
 {
@@ -21,6 +21,8 @@ public sealed class Player
     public int T;
     public int Hp = 100, MaxHp = 100;
     public int Invuln, DashCd, ComboTimer, NextCombo, Charge;
+    /// <summary>Health spent on the spin special; landing hits wins it back, getting hit loses it.</summary>
+    public int Recover, SpinCd;
     public float Focus;
 
     public Swing Swing;
@@ -53,7 +55,7 @@ public sealed class Enemy
     public int Hp, MaxHp;
     public float Poise, MaxPoise, PoiseIdle;
     public EState State = EState.Spawn;
-    public float T, AttackCd, StunLen, Flash;
+    public float T, AttackCd, StunLen, Flash, WallCd, BowlCd;
     public int Fracture, LastSwing = -1, BurstCast = -1;
     public bool HitPlayerThisAct;
     public int Mode, Sub, Pattern;
@@ -92,7 +94,7 @@ public sealed class Proj
 public enum Ev
 {
     Swing, Hit, Kill, Dash, Perfect, PlayerHurt, Shoot, Deflect, ShatterCast, Shatter,
-    Telegraph, Slam, ChargeFull, WaveStart, WaveClear, Victory, Defeat, Charge,
+    Telegraph, Slam, ChargeFull, WaveStart, WaveClear, Victory, Defeat, Charge, WallHit, Bowl,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>

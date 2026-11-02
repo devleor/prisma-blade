@@ -8,8 +8,8 @@ public class CombatTests
 {
     static readonly Vector2 Up = new(0f, -1f);
 
-    /// <summary>A world with no automatic waves; enemies placed by the test start awake and won't attack soon.</summary>
-    static World Arena() => new(seed: 1, waves: false);
+    /// <summary>An open world (no waves, no pillars); enemies placed by the test start awake and won't attack soon.</summary>
+    static World Arena() => new(seed: 1, waves: false, pillars: false);
 
     static Enemy Dummy(World w, EKind kind, Vector2 offset)
     {
@@ -30,7 +30,7 @@ public class CombatTests
     static List<GameEvent> Tap(World w, Inputs press, int thenFrames)
     {
         var all = Run(w, 1, press);
-        press.Light = press.Dash = press.Shatter = false;
+        press.Light = press.Dash = press.Shatter = press.Special = false;
         all.AddRange(Run(w, thenFrames, press));
         return all;
     }
@@ -383,5 +383,245 @@ public class CombatTests
         Run(w, 40);
         Assert.Empty(w.Projs);
         Assert.Equal(100, w.Player.Hp);
+    }
+
+    [Fact]
+    public void A_spike_that_charges_into_a_wall_is_hurt_and_dazed()
+    {
+        var w = Arena();
+        w.Player.Pos = new Vector2(Tune.HalfW - 60f, 0f);
+        var s = Dummy(w, EKind.Spike, new Vector2(-150f, 0f));
+        s.State = EState.Act; s.T = 0f; s.Aim = new Vector2(1f, 0f);
+        w.Player.Invuln = 1000; // the charge passes the player and meets the wall
+        var ev = Run(w, 20);
+        Assert.Contains(ev, x => x.Kind == Ev.WallHit && x.I == 1);
+        Assert.Equal(EState.Stun, s.State);
+        Assert.True(s.StunLen >= 60f);
+        Assert.True(s.Hp < s.MaxHp);
+    }
+
+    [Fact]
+    public void An_enemy_thrown_hard_into_a_wall_takes_impact_damage()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Spike, new Vector2(Tune.HalfW - 50f, 0f) - w.Player.Pos); // stun friction is strong: a throw only slams near a wall
+        e.State = EState.Stun; e.T = 0f; e.StunLen = 100f;
+        e.Vel = new Vector2(700f, 0f);
+        var ev = Run(w, 15);
+        Assert.Contains(ev, x => x.Kind == Ev.WallHit && x.I == 0);
+        Assert.True(e.Hp < e.MaxHp);
+        Assert.True(e.Vel.X <= 0f, "it bounces off");
+    }
+
+    [Fact]
+    public void Walking_into_a_wall_does_no_harm()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Spike, new Vector2(Tune.HalfW - 60f, 0f) - w.Player.Pos);
+        e.Vel = new Vector2(150f, 0f);
+        var ev = Run(w, 30);
+        Assert.DoesNotContain(ev, x => x.Kind == Ev.WallHit);
+        Assert.Equal(e.MaxHp, e.Hp);
+    }
+
+    [Fact]
+    public void The_boss_charging_into_a_wall_is_dazed_through_its_guard()
+    {
+        var w = Arena();
+        var b = Dummy(w, EKind.Monolith, new Vector2(Tune.HalfW - 200f, 0f) - w.Player.Pos);
+        b.State = EState.Act; b.T = 0f; b.Aim = new Vector2(1f, 0f);
+        float poise = b.Poise;
+        Run(w, 15);
+        Assert.Equal(EState.Stun, b.State);
+        Assert.True(b.Poise < poise);
+    }
+
+    [Fact]
+    public void Pillars_block_the_player_and_stop_shots()
+    {
+        var w = new World(seed: 1, waves: false);
+        var pl = w.Pillars[0];
+        w.Player.Pos = pl.Pos + new Vector2(-120f, 0f);
+        Run(w, 60, new Inputs { Move = new Vector2(1f, 0f) });
+        Assert.True(Vector2.Distance(w.Player.Pos, pl.Pos) >= pl.Radius + Tune.PlayerRadius - 0.5f);
+        w.Projs.Add(new Proj { Pos = pl.Pos + new Vector2(0f, -100f), Vel = new Vector2(0f, 300f), Life = 4f, Damage = 8 });
+        Run(w, 30);
+        Assert.Empty(w.Projs);
+    }
+
+    [Fact]
+    public void Enemies_placed_on_a_pillar_are_pushed_out_of_it()
+    {
+        var w = new World(seed: 9, waves: true);
+        for (int i = 0; i < 200; i++)
+        {
+            var e = w.Spawn(EKind.Bastion, w.Pillars[i % 4].Pos);
+            Assert.False(w.InsidePillar(e.Pos, e.Radius - 0.5f));
+        }
+    }
+
+    [Fact]
+    public void The_spin_hits_all_around_costs_health_and_protects_while_turning()
+    {
+        var w = Arena();
+        var front = Dummy(w, EKind.Bastion, Up * 70f);
+        var back = Dummy(w, EKind.Bastion, -Up * 70f);
+        var side = Dummy(w, EKind.Bastion, new Vector2(80f, 0f));
+        var ev = Tap(w, new Inputs { Special = true, Aim = Up }, 3);
+        Assert.Equal(100 - Moves.SpinCost, w.Player.Hp); // nothing hit yet: the windup is 3 frames
+        w.HurtPlayer(20, w.Player.Pos + Up, null);
+        Assert.Equal(PState.Attack, w.Player.State); // not knocked out of it
+        Assert.Equal(100 - Moves.SpinCost, w.Player.Hp); // and the hit was ignored
+        Assert.Equal(Moves.SpinCost, w.Player.Recover); // the cost is held as recoverable health
+        ev.AddRange(Run(w, 20));
+        Assert.Contains(ev, x => x.Kind == Ev.Swing && x.I == Moves.SpinIndex);
+        Assert.True(front.Hp < front.MaxHp && back.Hp < back.MaxHp && side.Hp < side.MaxHp);
+    }
+
+    [Fact]
+    public void Spin_health_comes_back_by_landing_hits_and_is_lost_when_hit()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Monolith, Up * 90f);
+        Tap(w, new Inputs { Special = true, Aim = Up }, 30);
+        Assert.Equal(100 - Moves.SpinCost + Tune.RecoverPerHit, w.Player.Hp); // the spin's own hit pays some back
+        Assert.Equal(Moves.SpinCost - Tune.RecoverPerHit, w.Player.Recover);
+        for (int i = 0; i < 2; i++) { e.Pos = w.Player.Pos + Up * 90f; Tap(w, new Inputs { Light = true, Aim = Up }, 25); }
+        Assert.Equal(100 - Moves.SpinCost + 3 * Tune.RecoverPerHit, w.Player.Hp);
+        w.HurtPlayer(5, w.Player.Pos + Up, null);
+        Assert.Equal(0, w.Player.Recover);
+    }
+
+    [Fact]
+    public void The_spin_cannot_be_used_at_low_health()
+    {
+        var w = Arena();
+        w.Player.Hp = Moves.SpinCost;
+        var ev = Tap(w, new Inputs { Special = true, Aim = Up }, 10);
+        Assert.DoesNotContain(ev, x => x.Kind == Ev.Swing);
+        Assert.Equal(Moves.SpinCost, w.Player.Hp);
+    }
+
+    [Fact]
+    public void The_combo_counter_grows_with_hits_and_drops_after_a_pause_or_a_hit_taken()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Monolith, Up * 90f);
+        for (int i = 0; i < 3; i++) { e.Pos = w.Player.Pos + Up * 90f; Tap(w, new Inputs { Light = true, Aim = Up }, 16); }
+        Assert.Equal(3, w.Combo);
+        w.HurtPlayer(5, w.Player.Pos + Up, null);
+        Assert.Equal(0, w.Combo);
+        Assert.Equal(3, w.BestCombo);
+        e.Pos = w.Player.Pos + Up * 90f;
+        Run(w, 60);
+        Tap(w, new Inputs { Light = true, Aim = Up }, 20);
+        Assert.Equal(1, w.Combo);
+        Run(w, Tune.ComboDrop + 5);
+        Assert.Equal(0, w.Combo);
+    }
+
+    [Fact]
+    public void A_thrown_enemy_bowls_over_the_ones_behind_it()
+    {
+        var w = Arena();
+        var thrown = Dummy(w, EKind.Spike, new Vector2(-200f, -100f));
+        var pin = Dummy(w, EKind.Spike, new Vector2(-120f, -100f));
+        var pin2 = Dummy(w, EKind.Spike, new Vector2(-75f, -100f));
+        thrown.State = EState.Stun; thrown.T = 0f; thrown.StunLen = 60f;
+        thrown.Vel = new Vector2(900f, 0f);
+        var ev = Run(w, 20);
+        Assert.Contains(ev, x => x.Kind == Ev.Bowl);
+        Assert.True(pin.Hp < pin.MaxHp);
+        Assert.True(pin2.Hp < pin2.MaxHp, "the knocked pin carries on into the next");
+        Assert.True(w.Combo >= 2);
+    }
+
+    [Fact]
+    public void A_walking_enemy_bumping_another_does_nothing()
+    {
+        var w = Arena();
+        var a = Dummy(w, EKind.Spike, new Vector2(-200f, -100f));
+        var b = Dummy(w, EKind.Spike, new Vector2(-170f, -100f));
+        a.Vel = new Vector2(150f, 0f);
+        var ev = Run(w, 20);
+        Assert.DoesNotContain(ev, x => x.Kind == Ev.Bowl);
+        Assert.Equal(b.MaxHp, b.Hp);
+    }
+
+    [Fact]
+    public void Wave_spawns_never_land_inside_a_pillar()
+    {
+        for (uint seed = 1; seed <= 40; seed++)
+        {
+            var w = new World(seed, waves: true);
+            w.Player.Pos = w.Pillars[(int)(seed % 4)].Pos + new Vector2(0f, 60f); // near stone, so the picker has to avoid it
+            for (int i = 0; i < 80; i++) w.Step(default);
+            foreach (var e in w.Enemies)
+                Assert.False(w.InsidePillar(e.Pos, 50f), $"seed {seed}: spawned at {e.Pos}");
+        }
+    }
+
+    [Fact]
+    public void A_charge_into_stone_is_not_the_players_hit()
+    {
+        var w = Arena();
+        w.Player.Pos = new Vector2(Tune.HalfW - 60f, 0f);
+        w.Player.Hp = 80; w.Player.Recover = 10;
+        var s = Dummy(w, EKind.Spike, new Vector2(-150f, 0f));
+        s.State = EState.Act; s.T = 0f; s.Aim = new Vector2(1f, 0f);
+        w.Player.Invuln = 1000;
+        var ev = Run(w, 20);
+        Assert.Contains(ev, x => x.Kind == Ev.WallHit && x.I == 1);
+        Assert.Equal(0, w.Combo);
+        Assert.Equal(80, w.Player.Hp);
+        Assert.Equal(10, w.Player.Recover);
+    }
+
+    [Fact]
+    public void A_charge_brushing_along_a_wall_does_not_daze()
+    {
+        var w = Arena();
+        var s = Dummy(w, EKind.Spike, new Vector2(-300f, 0f) - w.Player.Pos);
+        s.Pos = new Vector2(-300f, Tune.HalfH - s.Radius); // touching the bottom wall (Spawn keeps a margin)
+        s.State = EState.Act; s.T = 0f; s.Aim = Vector2.Normalize(new Vector2(1f, 0.02f));
+        var ev = Run(w, 20);
+        Assert.DoesNotContain(ev, x => x.Kind == Ev.WallHit);
+        Assert.NotEqual(EState.Stun, s.State);
+    }
+
+    [Fact]
+    public void A_wall_slam_never_shortens_a_longer_daze()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Spike, new Vector2(Tune.HalfW - 50f, 0f) - w.Player.Pos);
+        e.State = EState.Stun; e.T = 0f; e.StunLen = 200f;
+        e.Vel = new Vector2(700f, 0f);
+        var ev = Run(w, 10);
+        Assert.Contains(ev, x => x.Kind == Ev.WallHit);
+        Assert.True(e.StunLen - e.T > 150f, $"daze left {e.StunLen - e.T}");
+    }
+
+    [Fact]
+    public void A_wave_clear_heal_keeps_health_plus_recoverable_within_max()
+    {
+        var w = new World(seed: 5, waves: true);
+        Run(w, 80);
+        w.Player.Hp = 90; w.Player.Recover = 10;
+        foreach (var e in w.Enemies) e.Hp = 0;
+        Run(w, 2);
+        Assert.Equal(100, w.Player.Hp);
+        Assert.Equal(0, w.Player.Recover);
+    }
+
+    [Fact]
+    public void The_spin_cannot_cancel_into_another_spin()
+    {
+        var w = Arena();
+        var ev = Tap(w, new Inputs { Special = true, Aim = Up }, 18); // in the spin's recovery
+        ev.AddRange(Tap(w, new Inputs { Special = true, Aim = Up }, 10)); // long enough to see a second spin's swing event
+        Assert.Equal(1, ev.Count(x => x.Kind == Ev.Swing && x.I == Moves.SpinIndex));
+        Run(w, Moves.SpinCooldown + 10);
+        ev = Tap(w, new Inputs { Special = true, Aim = Up }, 6);
+        Assert.Equal(1, ev.Count(x => x.Kind == Ev.Swing && x.I == Moves.SpinIndex));
     }
 }

@@ -36,3 +36,19 @@ Kenney packs: https://kenney.nl/assets/<slug> - author Kenney (www.kenney.nl) - 
 | calm.mp3 | Calm Ambient 1 (Synthwave 4k) (001_Synthwave_4k.mp3, ~158 s, mp3 - no ffmpeg to convert) | https://opengameart.org/content/calm-ambient-1-synthwave-4k | cynicmusic | CC0 |
 
 Note: file choices were made by name/duration/pack description, not by listening.
+
+
+## Textures (`assets/textures`)
+
+All CC0 1.0 / public domain; no attribution required (credits given anyway). Raw downloads kept outside the repo in `AppData/Local/Temp/claude/prisma-tex-raw`. ambientCG assets: author ambientCG (Lennart Demes), the 1K-JPG `_Color` map converted to PNG at 1024x1024 (no other change).
+
+| File | Source page | Asset name | Author | Licence |
+|---|---|---|---|---|
+| floor.png | https://ambientcg.com/view?id=PavingStones003 | PavingStones003 (Color) | ambientCG | CC0 |
+| wall.png | https://ambientcg.com/view?id=Bricks076A | Bricks076A (Color) | ambientCG | CC0 |
+| pillar.png | https://ambientcg.com/view?id=Rock030 | Rock030 (Color) | ambientCG | CC0 |
+| particles/dust_puff.png | https://opengameart.org/content/smoke-particle-assets | whitePuff10.png (downscaled to max 128 px) | Kenney (www.kenney.nl) | CC0 |
+| particles/dust_puff2.png | same | whitePuff20.png (downscaled) | Kenney | CC0 |
+| particles/smoke_dark.png | same | blackSmoke10.png (downscaled) | Kenney | CC0 |
+| particles/smoke_dark2.png | same | blackSmoke20.png (downscaled) | Kenney | CC0 |
+| particles/spark_flash.png | same | flash00.png (downscaled) | Kenney | CC0 |

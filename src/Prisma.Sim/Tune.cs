@@ -6,7 +6,7 @@ namespace Prisma.Sim;
 public static class Tune
 {
     public const float Dt = 1f / 60f;
-    public const float HalfW = 760f, HalfH = 440f;
+    public const float HalfW = 590f, HalfH = 330f; // small enough to show whole on one screen
 
     // movement: velocity eases toward the target, so starts and stops have a little inertia
     public const float MoveSpeed = 330f, MoveSharp = 12f, AttackSteer = 0.12f, ChargeSpeedMul = 0.35f;
@@ -23,6 +23,10 @@ public static class Tune
     public const int ChargeMax = 45;
     public const float FocusMax = 100f, ShatterCost = 50f;
     public const int MaxFracture = 3;
+
+    // combo counter and enemy bowling
+    public const int ComboDrop = 150, RecoverPerHit = 2;
+    public const float BowlSpeed = 260f;
     public const float ShatterChainRadius = 165f;
     public const int ShatterChainDelay = 6;
 
@@ -68,6 +72,10 @@ public static class Moves
     ];
 
     /// <summary>Heavy slash, scaled by how long it was charged. A full charge adds a second fracture stack.</summary>
+    /// <summary>The spin special: a full circle, invulnerable while it turns. Costs health (won back by hitting).</summary>
+    public static readonly Swing Spin = new(3, 10, 16, -MathF.PI, MathF.PI, 122f, 18, 120f, 560f, 5, 1, 30);
+    public const int SpinCost = 10, SpinIndex = 4, SpinCooldown = 45;
+
     public static Swing Heavy(int charge)
     {
         float c = Math.Clamp(charge / (float)Tune.ChargeMax, 0f, 1f);
