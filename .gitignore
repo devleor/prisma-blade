@@ -1,0 +1,8 @@
+.godot/
+bin/
+obj/
+TestResults/
+test-results/
+*.user
+.claude/settings.local.json
+.agenfk/*.sqlite*
