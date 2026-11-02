@@ -1,0 +1,29 @@
+; Prisma Blade (Godot 4.7 .NET, C# on .NET 10)
+config_version=5
+
+[application]
+
+config/name="Prisma Blade"
+config/description="Hack-and-slash top-down: um quadrado, uma espada pesada, formas geometricas estilhacadas."
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[dotnet]
+
+project/assembly_name="PrismaBlade"
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+viewport/hdr_2d=true
+anti_aliasing/quality/msaa_2d=2

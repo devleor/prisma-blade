@@ -1,0 +1,387 @@
+using System.Numerics;
+using Prisma.Sim;
+using Xunit;
+
+namespace Prisma.Sim.Tests;
+
+public class CombatTests
+{
+    static readonly Vector2 Up = new(0f, -1f);
+
+    /// <summary>A world with no automatic waves; enemies placed by the test start awake and won't attack soon.</summary>
+    static World Arena() => new(seed: 1, waves: false);
+
+    static Enemy Dummy(World w, EKind kind, Vector2 offset)
+    {
+        var e = w.Spawn(kind, w.Player.Pos + offset);
+        e.State = EState.Idle;
+        e.AttackCd = 10_000f;
+        e.T = -1e6f; // the boss picks patterns from its idle time, not its cooldown
+        return e;
+    }
+
+    static List<GameEvent> Run(World w, int frames, Inputs inp = default)
+    {
+        var all = new List<GameEvent>();
+        for (int i = 0; i < frames; i++) { w.Step(inp); all.AddRange(w.Events); }
+        return all;
+    }
+
+    static List<GameEvent> Tap(World w, Inputs press, int thenFrames)
+    {
+        var all = Run(w, 1, press);
+        press.Light = press.Dash = press.Shatter = false;
+        all.AddRange(Run(w, thenFrames, press));
+        return all;
+    }
+
+    [Fact]
+    public void Movement_has_inertia_but_reaches_full_speed()
+    {
+        var w = Arena();
+        var inp = new Inputs { Move = new Vector2(1f, 0f) };
+        Run(w, 1, inp);
+        Assert.InRange(w.Player.Vel.X, 1f, Tune.MoveSpeed * 0.5f);
+        Run(w, 40, inp);
+        Assert.InRange(w.Player.Vel.X, Tune.MoveSpeed * 0.95f, Tune.MoveSpeed + 1f);
+        Run(w, 3);
+        Assert.True(w.Player.Vel.X > 0f, "still sliding a little after letting go");
+        Run(w, 40);
+        Assert.True(w.Player.Vel.Length() < 5f);
+    }
+
+    [Fact]
+    public void A_light_swing_hits_an_enemy_in_front_once()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Bastion, Up * 70f);
+        int hp = e.Hp;
+        var ev = Tap(w, new Inputs { Light = true, Aim = Up }, 30);
+        Assert.Equal(1, ev.Count(x => x.Kind == Ev.Hit));
+        Assert.Equal(hp - Moves.Light[0].Damage, e.Hp);
+    }
+
+    [Fact]
+    public void An_enemy_behind_is_outside_the_first_swing()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Bastion, -Up * 80f);
+        int hp = e.Hp;
+        Tap(w, new Inputs { Light = true, Aim = Up }, 30);
+        Assert.Equal(hp, e.Hp);
+    }
+
+    [Fact]
+    public void Three_presses_in_rhythm_chain_the_three_light_swings()
+    {
+        var w = Arena();
+        var swings = new List<int>();
+        for (int i = 0; i < 3; i++)
+            swings.AddRange(Tap(w, new Inputs { Light = true, Aim = Up }, 16).Where(x => x.Kind == Ev.Swing).Select(x => x.I));
+        Run(w, 40);
+        Assert.Equal([0, 1, 2], swings);
+    }
+
+    [Fact]
+    public void The_chain_resets_after_a_pause()
+    {
+        var w = Arena();
+        Tap(w, new Inputs { Light = true, Aim = Up }, 25 + Tune.ComboWindow + 5);
+        var ev = Tap(w, new Inputs { Light = true, Aim = Up }, 10);
+        Assert.Equal(0, ev.Single(x => x.Kind == Ev.Swing).I);
+    }
+
+    [Fact]
+    public void A_press_during_the_swing_is_buffered_and_dash_cancels_recovery()
+    {
+        var w = Arena();
+        var s = Moves.Light[0];
+        Tap(w, new Inputs { Light = true, Aim = Up }, s.Windup + 1); // inside the active frames
+        Assert.True(w.Player.BladeActive);
+        Tap(w, new Inputs { Dash = true, Move = new Vector2(1f, 0f) }, 0);
+        Assert.Equal(PState.Attack, w.Player.State); // held, not acted on mid-cut
+        Assert.Equal(Buffered.Dash, w.Player.Buffer);
+        int t = w.Player.T;
+        while (w.Player.State == PState.Attack && w.Player.T < 100) w.Step(new Inputs());
+        Assert.Equal(PState.Dash, w.Player.State);
+        Assert.True(t < s.Windup + s.Active + Tune.CancelDelay, "the press came before cancels opened");
+    }
+
+    [Fact]
+    public void A_buffered_press_expires()
+    {
+        var w = Arena();
+        Tap(w, new Inputs { Light = true, Aim = Up }, 0);
+        w.Player.State = PState.Hurt; w.Player.T = -100; // stuck long enough for the buffer to lapse
+        Run(w, Tune.BufferFrames + 1);
+        Assert.Equal(Buffered.None, w.Player.Buffer);
+    }
+
+    [Fact]
+    public void A_press_after_the_swing_ends_but_inside_the_window_continues_the_chain()
+    {
+        var w = Arena();
+        Tap(w, new Inputs { Light = true, Aim = Up }, Moves.Light[0].Total + 2);
+        Assert.Equal(PState.Free, w.Player.State);
+        var ev = Tap(w, new Inputs { Light = true, Aim = Up }, 10);
+        Assert.Equal(1, ev.Single(x => x.Kind == Ev.Swing).I);
+    }
+
+    [Fact]
+    public void Dash_covers_ground_fast_and_ignores_a_late_hit()
+    {
+        var w = Arena();
+        float x0 = w.Player.Pos.X;
+        Tap(w, new Inputs { Dash = true, Move = new Vector2(1f, 0f) }, Tune.PerfectFrames + 1);
+        Assert.True(w.Player.Pos.X - x0 > 120f);
+        w.HurtPlayer(20, w.Player.Pos + Up, null); // past the perfect window, still invulnerable
+        Assert.Equal(100, w.Player.Hp);
+        Assert.Equal(0, w.SlowMo);
+    }
+
+    [Fact]
+    public void Getting_hit_without_dodging_hurts()
+    {
+        var w = Arena();
+        var ev = new List<GameEvent>();
+        w.HurtPlayer(20, w.Player.Pos + Up, null);
+        Assert.Equal(80, w.Player.Hp);
+        Assert.Equal(PState.Hurt, w.Player.State);
+        w.HurtPlayer(20, w.Player.Pos + Up, null); // hurt invulnerability
+        Assert.Equal(80, w.Player.Hp);
+    }
+
+    [Fact]
+    public void A_perfect_dodge_slows_time_fractures_nearby_enemies_and_gives_focus()
+    {
+        var w = Arena();
+        var spike = Dummy(w, EKind.Spike, new Vector2(100f, 0f));
+        var far = Dummy(w, EKind.Spike, new Vector2(-600f, 0f));
+        Tap(w, new Inputs { Dash = true, Move = Up }, 2);
+        w.HurtPlayer(12, spike.Pos, spike);
+        Assert.Equal(100, w.Player.Hp);
+        Assert.True(w.SlowMo > 0);
+        Assert.Equal(2, spike.Fracture); // the attacker plus the area mark
+        Assert.Equal(0, far.Fracture);
+        Assert.Equal(25f, w.Player.Focus);
+    }
+
+    [Fact]
+    public void Slow_mo_slows_enemies_but_not_the_player()
+    {
+        (float enemy, float player) Moved(bool slow)
+        {
+            var w = Arena();
+            var e = Dummy(w, EKind.Spike, new Vector2(300f, 0f));
+            e.Vel = new Vector2(0f, 300f);
+            e.State = EState.Stun; e.StunLen = 1e6f; // coasting: only time scale changes its motion
+            if (slow) w.SlowMo = 30;
+            var inp = new Inputs { Move = new Vector2(-1f, 0f) };
+            float ey = e.Pos.Y, px = w.Player.Pos.X;
+            Run(w, 1, inp); // one frame: friction has not compounded yet, so the ratio is the time scale
+            return (e.Pos.Y - ey, w.Player.Pos.X - px);
+        }
+        var normal = Moved(false);
+        var slowed = Moved(true);
+        Assert.InRange(slowed.enemy / normal.enemy, 0.2f, 0.45f);
+        Assert.Equal(normal.player, slowed.player, 3);
+    }
+
+    [Fact]
+    public void A_full_charge_heavy_hits_harder_and_fractures_twice()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Monolith, Up * 120f);
+        int hp = e.Hp;
+        var hold = new Inputs { HeavyHeld = true, Aim = Up };
+        Run(w, Tune.ChargeMax + 5, hold);
+        Assert.Equal(PState.Charge, w.Player.State);
+        var ev = Run(w, 30, new Inputs { Aim = Up });
+        Assert.Contains(ev, x => x.Kind == Ev.Hit && x.I == 1);
+        Assert.Equal(hp - Moves.Heavy(Tune.ChargeMax).Damage, e.Hp);
+        Assert.Equal(2, e.Fracture);
+        Assert.True(Moves.Heavy(Tune.ChargeMax).Damage > Moves.Heavy(0).Damage + 30);
+    }
+
+    [Fact]
+    public void Shatter_bursts_fractured_enemies_and_the_chain_spreads_along_a_line()
+    {
+        var w = Arena();
+        var a = Dummy(w, EKind.Bastion, new Vector2(200f, 0f));
+        var b = Dummy(w, EKind.Bastion, new Vector2(340f, 0f));
+        var c = Dummy(w, EKind.Bastion, new Vector2(480f, 0f));
+        var lone = Dummy(w, EKind.Bastion, new Vector2(-500f, 0f));
+        a.Fracture = 2;
+        w.Player.Focus = Tune.FocusMax;
+        var ev = Tap(w, new Inputs { Shatter = true }, 40);
+        var depths = ev.Where(x => x.Kind == Ev.Shatter).Select(x => x.I).ToList();
+        Assert.Equal([0, 1, 2], depths);
+        Assert.True(a.Hp < 130 - 40 && b.Hp < 130 && c.Hp < 130);
+        Assert.Equal(130, lone.Hp);
+        Assert.Equal(Tune.FocusMax - Tune.ShatterCost, w.Player.Focus);
+    }
+
+    [Fact]
+    public void Shatter_needs_focus()
+    {
+        var w = Arena();
+        var a = Dummy(w, EKind.Bastion, new Vector2(100f, 0f));
+        a.Fracture = 1;
+        var ev = Tap(w, new Inputs { Shatter = true }, 20);
+        Assert.DoesNotContain(ev, x => x.Kind == Ev.ShatterCast);
+    }
+
+    [Fact]
+    public void Armour_ignores_light_flinch_until_poise_breaks()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Bastion, Up * 70f);
+        Tap(w, new Inputs { Light = true, Aim = Up }, 8);
+        Assert.NotEqual(EState.Stun, e.State);
+        for (int i = 0; i < 4 && e.State != EState.Stun; i++)
+        {
+            e.Pos = w.Player.Pos + Up * 70f;
+            Tap(w, new Inputs { Light = true, Aim = Up }, 8);
+            Run(w, 12);
+        }
+        Assert.Equal(EState.Stun, e.State);
+    }
+
+    [Fact]
+    public void Hitstop_freezes_the_world_for_a_few_frames()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Spike, Up * 60f);
+        var inp = new Inputs { Light = true, Aim = Up };
+        w.Step(inp);
+        inp.Light = false;
+        for (int i = 0; i < 30 && w.Events.All(x => x.Kind != Ev.Hit); i++) w.Step(inp);
+        Assert.True(w.Hitstop >= Moves.Light[0].Hitstop, "the hit starts hitstop");
+        var at = e.Pos;
+        int playerT = w.Player.T, frame = w.Frame;
+        w.Step(inp);
+        Assert.Equal(frame + 1, w.Frame);
+        Assert.Equal(at, e.Pos);
+        Assert.Equal(playerT, w.Player.T);
+    }
+
+    [Fact]
+    public void The_sword_reflects_enemy_shots()
+    {
+        var w = Arena();
+        var shooter = Dummy(w, EKind.Orb, Up * 400f);
+        shooter.Speed = 0f; // a still target, so the test is about the reflection, not about aiming
+        w.Projs.Add(new Proj { Pos = w.Player.Pos + Up * 60f, Vel = -Up * 100f, Life = 3f, Damage = 8 });
+        var ev = Tap(w, new Inputs { Light = true, Aim = Up }, 12);
+        Assert.Contains(ev, x => x.Kind == Ev.Deflect);
+        Assert.True(w.Projs.Count == 0 || w.Projs[0].Friendly);
+        Run(w, 60);
+        Assert.True(shooter.Hp < 30, "the reflected shot flies back and hurts its owner");
+    }
+
+    [Fact]
+    public void Clearing_a_wave_heals_and_brings_the_next()
+    {
+        var w = new World(seed: 3, waves: true);
+        Run(w, 80);
+        Assert.Equal(0, w.Wave);
+        Assert.Equal(World.Waves[0].Length, w.Enemies.Count);
+        w.Player.Hp = 50;
+        foreach (var e in w.Enemies) e.Hp = 0;
+        Run(w, 2);
+        Assert.Equal(Phase.Intermission, w.Phase);
+        Assert.Equal(75, w.Player.Hp);
+        Run(w, 130);
+        Assert.Equal(1, w.Wave);
+        Assert.Equal(World.Waves[1].Length, w.Enemies.Count);
+    }
+
+    [Fact]
+    public void A_spike_telegraphs_then_charges_into_the_player()
+    {
+        var w = Arena();
+        var s = Dummy(w, EKind.Spike, new Vector2(250f, 0f));
+        s.AttackCd = 0f;
+        var ev = Run(w, 90);
+        Assert.Contains(ev, x => x.Kind == Ev.Telegraph);
+        Assert.True(w.Player.Hp < 100, "the charge connects with a player standing still");
+    }
+
+    [Fact]
+    public void The_boss_cycles_charges_bursts_and_summons()
+    {
+        var w = Arena();
+        var boss = Dummy(w, EKind.Monolith, Up * 300f);
+        boss.T = 0f;
+        w.Player.Invuln = 100_000;
+        var ev = Run(w, 1200);
+        Assert.Contains(ev, x => x.Kind == Ev.Shoot && x.A == 1f);
+        Assert.Contains(w.Enemies, e => e.Kind == EKind.Spike);
+        Assert.True(ev.Count(x => x.Kind == Ev.Telegraph && x.I == (int)EKind.Monolith) >= 4);
+    }
+
+    [Fact]
+    public void Losing_all_health_ends_the_run()
+    {
+        var w = new World(seed: 2, waves: true);
+        w.Player.Hp = 5;
+        w.HurtPlayer(10, w.Player.Pos + Up, null);
+        Assert.Equal(PState.Dead, w.Player.State);
+        Assert.Equal(Phase.Lost, w.Phase);
+    }
+
+    [Fact]
+    public void A_leftover_shot_cannot_turn_a_victory_into_a_defeat()
+    {
+        var w = new World(seed: 4, waves: true);
+        w.Wave = World.Waves.Length - 1;
+        w.Phase = Phase.Fighting;
+        w.Player.Hp = 5;
+        w.Projs.Add(new Proj { Pos = w.Player.Pos + new Vector2(200f, 0f), Vel = new Vector2(-300f, 0f), Life = 4f, Damage = 10 });
+        Run(w, 2);
+        Assert.Equal(Phase.Won, w.Phase);
+        Assert.Empty(w.Projs);
+        w.HurtPlayer(10, w.Player.Pos, null);
+        Assert.Equal(Phase.Won, w.Phase);
+        Assert.Equal(5, w.Player.Hp);
+    }
+
+    [Fact]
+    public void A_second_shatter_during_a_chain_does_not_burst_the_same_enemy_twice()
+    {
+        var w = Arena();
+        var a = Dummy(w, EKind.Monolith, new Vector2(200f, 0f));
+        var b = Dummy(w, EKind.Monolith, new Vector2(300f, 0f));
+        a.Fracture = 1;
+        w.Player.Focus = Tune.FocusMax;
+        var ev = Tap(w, new Inputs { Shatter = true }, 0);
+        for (int i = 0; i < 30 && ev.All(x => x.Kind != Ev.Shatter); i++) ev.AddRange(Run(w, 1));
+        Assert.True(w.ChainRunning, "a has burst and b is queued in the chain");
+        Assert.True(b.Fracture > 0);
+        ev.AddRange(Tap(w, new Inputs { Shatter = true }, 60));
+        Assert.Equal(2, ev.Count(x => x.Kind == Ev.Shatter)); // a once, b once
+    }
+
+    [Fact]
+    public void An_enemy_touching_the_players_back_is_not_cut()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Bastion, -Up * 300f);
+        int hp = e.Hp;
+        Tap(w, new Inputs { Light = true, Aim = Up }, Moves.Light[0].Windup); // the swing starts on the press frame (T=0), so after this the edge goes live next frame
+        e.Pos = w.Player.Pos - Up * 30f; // overlapping the player's back on exactly that frame
+        Run(w, 12);
+        Assert.Equal(hp, e.Hp);
+    }
+
+    [Fact]
+    public void A_dodged_shot_is_used_up_and_cannot_hit_after_the_dash()
+    {
+        var w = Arena();
+        Tap(w, new Inputs { Dash = true, Move = new Vector2(1f, 0f) }, 1);
+        w.Projs.Add(new Proj { Pos = w.Player.Pos, Vel = new Vector2(1f, 0f), Life = 4f, Damage = 10 });
+        Run(w, 40);
+        Assert.Empty(w.Projs);
+        Assert.Equal(100, w.Player.Hp);
+    }
+}

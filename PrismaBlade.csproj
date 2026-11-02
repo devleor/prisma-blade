@@ -1,0 +1,16 @@
+<Project Sdk="Godot.NET.Sdk/4.7.1">
+  <!-- The Godot game. Rules live in src/Prisma.Sim, which has no Godot dependency and is unit-tested. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Prisma</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="src/**" />
+    <Compile Remove="tests/**" />
+    <Compile Remove="tools/**" />
+    <ProjectReference Include="src/Prisma.Sim/Prisma.Sim.csproj" />
+  </ItemGroup>
+</Project>
