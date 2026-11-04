@@ -73,6 +73,24 @@ queimando ganha chama, e o que leva golpe incha um pouco por um instante.
 manchas de aquarela no papel, tufos de grama e pedrinhas perto das paredes e dos pilares. Parede de tijolo com
 hachura na sombra. Cada sala sorteia o chão pela semente dela.
 
+**Biomas** (um por fase, `Floor.cs`, papel tingido para cada um):
+- 牢 Masmorra: lajotas, tijolos e tufos (o chão acima).
+- 森 Floresta Chuvosa: terra e musgo hachurado, poças com reflexo, folhas caídas, raízes saindo das bordas;
+  parede de sebe com troncos. Chuva.
+- 灰 Cavernas de Cinza: basalto hexagonal com rachaduras de brasa (HDR, brilham), montes de cinza, cascalho;
+  parede de rocha com veios de brasa. Cai cinza e sobem fagulhas.
+- 沼 Pântano: lama, charcos hachurados com vitórias-régias, juncos e taboas em volta; paliçada de madeira podre.
+  Garoa.
+- 晶 Templo de Cristal: treliça em losango, círculos de runas, cristais brilhando junto às paredes; blocos claros
+  com veios de cristal. Pontos de luz flutuando.
+
+**Clima** (`Weather.cs`, por cima de tudo, abaixo do HUD): a chuva é feita de traços de caneta inclinados pelo
+vento que caem até um ponto do chão e viram um anelzinho com dois respingos; na floresta, relâmpago de vez em
+quando (flash e tremor). Feito em código, como a chuva do Ecos da Fenda.
+
+**Armas novas.** Lança: haste de freixo, amarração vermelha, ponta em folha. Martelo de Guerra: cabo de madeira,
+cabeça de ferro com cinta de latão e um espigão atrás.
+
 **Portões.** Aberto: passagem escura com uma seta e a marca do que tem atrás (? desconhecido, 宝 tesouro,
 鬼 chefe, ★ elite). Fechado: grade de ferro.
 

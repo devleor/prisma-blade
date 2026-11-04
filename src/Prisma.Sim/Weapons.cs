@@ -1,6 +1,6 @@
 namespace Prisma.Sim;
 
-public enum WKind { Longa, Montante, Adagas, Foice, Katana, Runica }
+public enum WKind { Longa, Montante, Adagas, Foice, Katana, Runica, Lanca, Martelo }
 
 /// <summary>
 /// A sword: its light chain, how its charged heavy scales, and the one thing it does differently.
@@ -65,7 +65,22 @@ public sealed record Weapon(
         new(8, 7, 20, -2.5f, 2.5f, 124f, 14, 400f, 380f, 5, 1, 16),
     ], HeavyDamage: 0.8f, FractureEveryHit: true);
 
-    public static readonly Weapon[] All = [Longa, Montante, Adagas, Foice, Katana, Runica];
+    /// <summary>Spear: narrow thrusts that reach far; the third one goes straight through and staggers.</summary>
+    public static readonly Weapon Lanca = new(WKind.Lanca, "Lança", "estocadas longas e estreitas; mantém tudo à distância",
+    [
+        new(5, 4, 12, -0.3f, 0.25f, 178f, 10, 320f, 300f, 3, 0, 14),
+        new(5, 4, 12, 0.3f, -0.25f, 178f, 10, 330f, 300f, 3, 0, 14),
+        new(9, 6, 20, -0.4f, 0.4f, 200f, 18, 520f, 520f, 5, 1, 34),
+    ], HeavyReach: 70f, HeavyWindup: 2, HeavyKnock: 1.2f, DashCooldown: 24);
+
+    /// <summary>War hammer: two slow blows that crush guards and stun long; stone hurts more.</summary>
+    public static readonly Weapon Martelo = new(WKind.Martelo, "Martelo de Guerra", "dois golpes lentos que quebram a guarda e atordoam",
+    [
+        new(10, 6, 20, -1.5f, 1.2f, 118f, 16, 260f, 420f, 7, 0, 55),
+        new(13, 7, 26, 1.8f, -1.6f, 124f, 24, 340f, 600f, 9, 1, 80),
+    ], HeavyDamage: 1.3f, HeavyWindup: 3, HeavyKnock: 1.4f, ChargeFrames: 50, DashCooldown: 26, WallDamage: 1.5f);
+
+    public static readonly Weapon[] All = [Longa, Montante, Adagas, Foice, Katana, Runica, Lanca, Martelo];
 
     public static Weapon Of(WKind k) => All[(int)k];
 }

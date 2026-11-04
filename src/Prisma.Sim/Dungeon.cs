@@ -7,6 +7,9 @@ public enum RoomKind { Start, Fight, Elite, Treasure, Boss }
 public enum Side { N, E, S, W }
 
 /// <summary>One room of a floor's map. A fight room holds waves and then its guardians, who keep the gates shut.</summary>
+/// <summary>Each floor is its own place: the dungeon, a rainy forest, ash caves, a swamp, a crystal temple.</summary>
+public enum Biome { Masmorra, Floresta, Cinzas, Pantano, Cristal }
+
 public sealed class RoomNode
 {
     public int X, Y, Depth, Layout, Seed;
@@ -37,7 +40,7 @@ public static class Sides
 /// </summary>
 public sealed class Dungeon(int floor)
 {
-    public const int Floors = 3;
+    public const int Floors = 5;
     public readonly int Floor = floor;
     public readonly Dictionary<(int, int), RoomNode> Rooms = [];
     public RoomNode Start = null!, Boss = null!;
@@ -71,6 +74,9 @@ public sealed class Dungeon(int floor)
     ];
 
     public static int RoomCount(int floor) => 7 + floor;
+
+    public static Biome BiomeOf(int floor) => (Biome)(Math.Clamp(floor, 0, Floors - 1) % 5);
+    public Biome Biome => BiomeOf(Floor);
 
     public static Dungeon Make(uint seed, int floor)
     {
@@ -211,6 +217,22 @@ public sealed partial class World
     {
         Map = Dungeon.Make(runSeed, floor);
         EnterRoom(Map.Start, null);
+        if (floor > 0) RaiseWeaponAltars();
+    }
+
+    /// <summary>Down a floor: three swords you do not hold wait in the first room (take one, or keep yours).</summary>
+    void RaiseWeaponAltars()
+    {
+        var swords = Weapon.All.Where(w => w.Kind != Player.Weapon.Kind).Select(w => w.Kind).ToList();
+        var offers = new Offer[3];
+        for (int i = 0; i < 3; i++)
+        {
+            var k = swords[(int)(runRng.Next() % (uint)swords.Count)];
+            swords.Remove(k);
+            offers[i] = new Offer(OfferKind.Weapon, k);
+        }
+        Room.Pending = offers;
+        PlaceAltars(offers);
     }
 
     /// <summary>Walks into a room, through the door on side <paramref name="via"/> of the room left (null: placed).</summary>

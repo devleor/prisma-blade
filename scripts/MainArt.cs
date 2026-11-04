@@ -34,6 +34,24 @@ public partial class Main
         _ => new Color(0.6f, 0.52f, 0.5f),
     };
 
+    public static string BiomeName(Biome b) => b switch
+    {
+        Biome.Floresta => "Floresta Chuvosa",
+        Biome.Cinzas => "Cavernas de Cinza",
+        Biome.Pantano => "Pântano",
+        Biome.Cristal => "Templo de Cristal",
+        _ => "Masmorra",
+    };
+
+    public static string BiomeKanji(Biome b) => b switch
+    {
+        Biome.Floresta => "森",
+        Biome.Cinzas => "灰",
+        Biome.Pantano => "沼",
+        Biome.Cristal => "晶",
+        _ => "牢",
+    };
+
     public static string KindName(EKind k) => k switch
     {
         EKind.Spike => "Chifrudo",
@@ -64,6 +82,8 @@ public partial class Main
         WKind.Katana => new Color(0.7f, 0.85f, 1f),
         WKind.Foice => new Color(0.7f, 0.78f, 0.6f),
         WKind.Montante => new Color(1f, 0.8f, 0.55f),
+        WKind.Lanca => new Color(0.95f, 0.9f, 0.7f),
+        WKind.Martelo => new Color(0.85f, 0.75f, 0.7f),
         _ => new Color(1f, 0.97f, 0.9f),
     };
 
@@ -339,6 +359,32 @@ public partial class Main
         var leather = new Color(0.45f, 0.3f, 0.18f, alpha);
         switch (kind)
         {
+            case WKind.Lanca:
+            {
+                // a long ash shaft with a red binding and a leaf-shaped head
+                var end = hilt + dir * len * 1.25f;
+                Ink.Stroke(this, [hilt - dir * 26 * scale, end - dir * 4 * scale], false, 4.5f * scale, seed, new Color(0.55f, 0.4f, 0.24f, alpha));
+                Ink.Stroke(this, [hilt - dir * 26 * scale, end - dir * 4 * scale], false, 1.3f * scale, seed + 1, ink);
+                var bind = end - dir * 8 * scale;
+                DrawLine(bind - side * 4 * scale, bind + side * 4 * scale, new Color(0.75f, 0.15f, 0.12f, alpha), 4f * scale);
+                Vector2[] head = [end - dir * 2 * scale + side * 5 * scale, end + dir * 10 * scale + side * 7 * scale, end + dir * 30 * scale, end + dir * 10 * scale - side * 7 * scale, end - dir * 2 * scale - side * 5 * scale];
+                Ink.Shape(this, head, steel, seed + 2, 2f * scale, 0f, ink);
+                Ink.Line2(this, end, end + dir * 24 * scale, 1f * scale, seed + 3, new Color(Ink.Line, 0.4f * alpha));
+                break;
+            }
+            case WKind.Martelo:
+            {
+                // a wooden haft with an iron-banded block head and a spike on the back
+                var end = hilt + dir * len * 0.85f;
+                Ink.Stroke(this, [hilt - dir * 14 * scale, end], false, 5f * scale, seed, new Color(0.45f, 0.3f, 0.18f, alpha));
+                Ink.Stroke(this, [hilt - dir * 14 * scale, end], false, 1.4f * scale, seed + 1, ink);
+                float hw = 20f * scale, hd = 12f * scale;
+                Vector2[] block = [end + side * hw - dir * hd, end + side * hw + dir * hd, end - side * hw * 0.7f + dir * hd, end - side * hw * 0.7f - dir * hd];
+                Ink.Shape(this, block, new Color(0.42f, 0.42f, 0.46f, alpha), seed + 2, 2.4f * scale, 3f * scale, ink);
+                DrawLine(end + side * hw * 0.55f - dir * hd, end + side * hw * 0.55f + dir * hd, new Color(0.7f, 0.55f, 0.25f, alpha), 2.5f * scale);
+                Ink.Shape(this, [end - side * hw * 0.7f + dir * 5 * scale, end - side * (hw + 14 * scale), end - side * hw * 0.7f - dir * 5 * scale], steel, seed + 4, 1.6f * scale, 0f, ink);
+                break;
+            }
             case WKind.Foice:
             {
                 var shaftEnd = hilt + dir * len;

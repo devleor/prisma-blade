@@ -70,6 +70,17 @@ public partial class GameCheck : Node
             case 91: Input.ActionRelease(Controls.Dash); break;
             case 94: Check(p.State == PState.Dash, "dash starts on the dash action"); break;
             case 130: Input.ActionPress(Controls.Heavy); break;
+            case 140:
+                Check(main.WeatherFx.Kind == Sky.None, "the dungeon floor has no weather");
+                main.WeatherFx.Set(Sky.Rain);
+                Check(main.WeatherFx.Count > 100, $"rain falls in the forest ({main.WeatherFx.Count} drops)");
+                break;
+            case 185:
+                Check(main.WeatherFx.Splashes > 0, "raindrops land as little rings on the floor");
+                main.WeatherFx.Set(Weather.Of(Biome.Cinzas));
+                Check(main.WeatherFx.Kind == Sky.Ash, "the ash caves have falling ash");
+                main.WeatherFx.Set(Sky.None);
+                break;
             case 190:
                 Check(p.State == PState.Charge && p.Charge == Tune.ChargeMax, "holding attack_heavy charges to full");
                 Input.ActionRelease(Controls.Heavy);

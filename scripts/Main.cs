@@ -69,6 +69,8 @@ public partial class Main : Node2D
         AddChild(Env = new WorldEnvironment { Environment = env });
 
         AddChild(Fx = new Fx());
+        AddChild(WeatherFx = new Weather(this));
+        WeatherFx.Set(Weather.Of(World.Map.Biome));
         var layer = new CanvasLayer();
         AddChild(layer);
         layer.AddChild(Hud = new Hud(this));
@@ -133,6 +135,11 @@ public partial class Main : Node2D
         kick = kick.Lerp(Vector2.Zero, 1f - Mathf.Exp(-14f * dt));
         Camera.Offset = new Vector2(rng.RandfRange(-s, s), rng.RandfRange(-s, s)) + kick;
     }
+
+    public Weather WeatherFx { get; private set; } = null!;
+
+    /// <summary>A small shake from outside the fight (thunder).</summary>
+    public void Rumble(float amount) => Shake(amount);
 
     void Shake(float amount) => trauma = Mathf.Min(1f, trauma + amount * Settings.Shake);
 
@@ -321,6 +328,7 @@ public partial class Main : Node2D
             case Ev.RoomEnter:
                 FloorArt.Redraw();
                 Stains.Show(World.Map.Floor, World.Room.X, World.Room.Y);
+                WeatherFx.Set(Weather.Of(World.Map.Biome));
                 trail.Clear(); ghosts.Clear();
                 if ((RoomKind)(int)ev.A == RoomKind.Treasure) Hud.Show("TESOURO", "golpeie o altar que você quer levar", 2.2f);
                 else if (!World.Room.Cleared) Sfx.Play("heavy_hit", -4f, 0.5f); // the gates slam shut behind you
@@ -363,9 +371,12 @@ public partial class Main : Node2D
             case Ev.NextFloor:
                 Sfx.Music("battle");
                 Sfx.Play("shatter", 0f, 0.5f);
-                Hud.Round(ev.I + 1, $"FASE {ev.I + 1}", "a dungeon muda: salas mais cheias, chefe mais forte", true);
-                Shake(0.5f);
+            {
+                var biome = Dungeon.BiomeOf(ev.I);
+                Hud.Splash(BiomeKanji(biome), $"FASE {ev.I + 1} · {BiomeName(biome).ToUpper()}", "três espadas esperam na primeira sala", new Color(0.72f, 0.1f, 0.08f), 2.2f);
+                Shake(0.6f);
                 break;
+            }
             case Ev.Altars:
                 Sfx.Play("wave_start", -6f, 1.4f, 0f);
                 break;
