@@ -60,8 +60,8 @@ void fragment() {
 }";
 
     readonly ColorRect impactRect;
-    float impactT;
-    ulong lastImpact;
+    ulong impactUntil, lastImpact;
+    const ulong ImpactMs = 75;
 
     /// <summary>A one-frame ink negative on a big blow. Off in the settings; never more than one per second,
     /// so a big wave breaking guards one after another does not strobe.</summary>
@@ -70,7 +70,7 @@ void fragment() {
         ulong now = Time.GetTicksMsec();
         if (!Settings.ImpactFrames || now - lastImpact < 1000 && lastImpact != 0) return false;
         lastImpact = now;
-        impactT = 0.075f;
+        impactUntil = now + ImpactMs; // real time: the kill cam's slow motion must not stretch the flash
         return true;
     }
 
@@ -195,8 +195,7 @@ void fragment() {
         splashT = Mathf.Max(0, splashT - dt);
         flashT = Mathf.Max(0, flashT - dt);
         speedT = Mathf.Max(0, speedT - dt);
-        impactT = Mathf.Max(0, impactT - (float)delta);
-        impactRect.Visible = impactT > 0;
+        impactRect.Visible = Time.GetTicksMsec() < impactUntil;
         for (int i = splats.Count - 1; i >= 0; i--)
         {
             var s = splats[i];

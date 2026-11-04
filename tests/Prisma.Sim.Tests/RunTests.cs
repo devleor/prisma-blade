@@ -438,7 +438,8 @@ public class RunTests
             for (int f = 0; f < Dungeon.Floors; f++)
                 foreach (var r in Dungeon.Make(seed, f).Rooms.Values)
                 {
-                    foreach (var wave in r.Waves) Assert.True(wave.Length <= Math.Max(Dungeon.MaxPerWave, 20));
+                    for (int i = 0; i < r.Waves.Length; i++)
+                        Assert.True(r.Waves[i].Length <= (i == r.Horde ? 20 : Dungeon.MaxPerWave), $"wave {i} has {r.Waves[i].Length}");
                     biggest = Math.Max(biggest, r.Waves.Where((_, i) => i != r.Horde).Select(x => x.Length).DefaultIfEmpty().Max());
                     if (f == 0 && r.Depth == 1 && r.Horde < 0) firstRoomMost = Math.Max(firstRoomMost, r.Waves.Select(x => x.Length).DefaultIfEmpty().Max());
                     if (r.Horde >= 0)

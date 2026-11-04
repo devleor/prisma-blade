@@ -57,7 +57,7 @@ public static class InkBatch
     {
         int n = pts.Length;
         if (n < 2) return;
-        Room(n * 2);
+        Room(n * 4);
         float h = Mathf.Max(0.5f, w * 0.5f);
         int b = P.Count;
         Vector2 last = Vector2.Zero;
@@ -68,18 +68,27 @@ public static class InkBatch
             if (n0 == Vector2.Zero) n0 = n1;
             if (n1 == Vector2.Zero) n1 = n0;
             if (n0 == Vector2.Zero) n0 = n1 = last == Vector2.Zero ? Vector2.Up : last;
+            last = n1;
             var m = n0 + n1;
             float ml = m.Length();
-            Vector2 off;
-            if (ml < 1e-3f) off = n1 * h;
-            else { m /= ml; off = m * (h / Mathf.Max(m.Dot(n1), 0.4f)); }
-            last = n1;
-            P.Add(pts[i] + off); P.Add(pts[i] - off);
-            C.Add(c); C.Add(c);
+            if (ml > 1e-3f && (m / ml).Dot(n1) >= 0.5f)
+            {
+                // an ordinary corner: one mitred pair (never longer than twice the half-width)
+                m /= ml;
+                var off = m * (h / (m.Dot(n1)));
+                P.Add(pts[i] + off); P.Add(pts[i] - off);
+                C.Add(c); C.Add(c);
+            }
+            else
+            {
+                // a sharp corner (a hand zigzag): bevel it with two pairs instead of a long spike
+                P.Add(pts[i] + n0 * h); P.Add(pts[i] - n0 * h);
+                P.Add(pts[i] + n1 * h); P.Add(pts[i] - n1 * h);
+                C.Add(c); C.Add(c); C.Add(c); C.Add(c);
+            }
         }
-        for (int i = 0; i < n - 1; i++)
+        for (int a = b; a + 3 < P.Count; a += 2)
         {
-            int a = b + i * 2;
             I.Add(a); I.Add(a + 1); I.Add(a + 2);
             I.Add(a + 1); I.Add(a + 3); I.Add(a + 2);
         }
