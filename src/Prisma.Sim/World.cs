@@ -36,7 +36,7 @@ public sealed partial class World
         Events.Clear();
     }
 
-    void Emit(Ev kind, Vector2 pos, float a = 0f, int i = 0) => Events.Add(new GameEvent(kind, pos, a, i));
+    void Emit(Ev kind, Vector2 pos, float a = 0f, int i = 0, int k = -1) => Events.Add(new GameEvent(kind, pos, a, i, k));
 
     public void Step(Inputs inp)
     {
@@ -328,7 +328,7 @@ public sealed partial class World
         e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + fracture);
         Hitstop = Math.Max(Hitstop, s.Hitstop + (echo ? 4 : 0));
         AddFocus(heavy ? 10f : 4f);
-        Emit(Ev.Hit, e.Pos, dmg, heavy || echo ? 1 : 0);
+        Emit(Ev.Hit, e.Pos, dmg, heavy || echo ? 1 : 0, (int)e.Kind);
     }
 
     /// <summary>Damage, poise and knockback for any source. Armoured enemies only flinch once their poise breaks.</summary>
@@ -342,7 +342,11 @@ public sealed partial class World
         {
             e.Poise -= poiseDmg;
             e.PoiseIdle = 0f;
-            if (e.Poise <= 0f) { e.Poise = e.MaxPoise; stun = e.Boss ? 80f : 55f; Emit(Ev.GuardBreak, e.Pos, e.Radius, (int)e.Kind); }
+            if (e.Poise <= 0f)
+            {
+                e.Poise = e.MaxPoise; stun = e.Boss ? 80f : 55f;
+                if (e.Hp > 0) Emit(Ev.GuardBreak, e.Pos, e.Radius, (int)e.Kind); // any source; not on the blow that kills
+            }
             else armoured = true;
         }
         float scale = e.Boss ? 0.35f : 1f;
@@ -409,7 +413,7 @@ public sealed partial class World
             if (!e.Hittable || Vector2.Distance(e.Pos, p.Pos) > 170f + e.Radius) continue;
             e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + 1);
             Damage(e, 10, Tune.Norm(e.Pos - p.Pos), 300f, 15f, 16f);
-            Emit(Ev.Hit, e.Pos, 10, 1);
+            Emit(Ev.Hit, e.Pos, 10, 1, (int)e.Kind);
         }
     }
 
@@ -498,7 +502,7 @@ public sealed partial class World
                 if (e.Hittable && Vector2.Distance(e.Pos, p.Pos) < Tune.PerfectMarkRadius + e.Radius)
                 {
                     Damage(e, spikes, Tune.Norm(e.Pos - p.Pos), 260f, 20f, 24f);
-                    Emit(Ev.Hit, e.Pos, spikes, 1);
+                    Emit(Ev.Hit, e.Pos, spikes, 1, (int)e.Kind);
                 }
         Emit(Ev.Perfect, p.Pos);
     }

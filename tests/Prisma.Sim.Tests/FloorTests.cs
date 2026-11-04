@@ -128,4 +128,20 @@ public class FloorTests
         Assert.Equal((int)EKind.Bastion, breaks[0].I);
         Assert.Equal(EState.Stun, golem.State);
     }
+
+    [Fact]
+    public void The_blow_that_kills_names_its_target_and_breaks_no_guard()
+    {
+        var w = Arena();
+        w.Player.Weapon = Weapon.Of(WKind.Martelo);
+        var golem = Dummy(w, EKind.Bastion, Up * 70f);
+        golem.Hp = 1;
+        var seen = new List<GameEvent>();
+        w.Step(new Inputs { Light = true, Aim = Up }); seen.AddRange(w.Events);
+        for (int i = 0; i < 30; i++) { w.Step(new Inputs { Aim = Up }); seen.AddRange(w.Events); }
+        Assert.False(golem.Alive);
+        var hit = Assert.Single(seen, e => e.Kind == Ev.Hit);
+        Assert.Equal((int)EKind.Bastion, hit.K); // the corpse is already gone from World.Enemies when the view hears it
+        Assert.DoesNotContain(seen, e => e.Kind == Ev.GuardBreak);
+    }
 }

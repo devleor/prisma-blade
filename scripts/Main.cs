@@ -79,10 +79,11 @@ public partial class Main : Node2D
         if (!Peaceful) Hud.Show("PRISMA BLADE", "escolha uma porta · mate o guardião para abrir os portões", 3.5f);
     }
 
-    /// <summary>Esc opens the pause menu; the Esc that closes it is consumed by the menu, so it cannot reopen it.</summary>
+    /// <summary>Esc (or Start) opens the pause menu; the press that closes it is consumed by the menu, so it cannot reopen it.
+    /// Its own action, not ui_cancel: ui_cancel also holds pad B, which is the shatter button in a fight.</summary>
     public override void _UnhandledInput(InputEvent e)
     {
-        if (e.IsActionPressed("ui_cancel") && !Peaceful && Pause == null) { OpenPause(); GetViewport().SetInputAsHandled(); }
+        if (e.IsActionPressed(Controls.Pause) && !Peaceful && Pause == null) { OpenPause(); GetViewport().SetInputAsHandled(); }
     }
 
     public override void _Input(InputEvent e)
@@ -221,11 +222,12 @@ public partial class Main : Node2D
             {
                 bool heavy = ev.I == 1;
                 float a = (pos - G(p.Pos)).Angle();
-                var struck = World.Enemies.OrderBy(e => (G(e.Pos) - pos).LengthSquared()).FirstOrDefault();
-                HitSound(struck?.Kind, heavy);
+                // the event carries the kind: a killing blow's target is already gone from World.Enemies
+                EKind? struck = ev.K >= 0 ? (EKind)ev.K : null;
+                HitSound(struck, heavy);
                 Fx.Sparks(pos, a, 0.7f, heavy ? HeavyCol : Ink.Line, heavy ? 14 : 8, heavy ? 700 : 520);
                 Fx.Number(pos, ((int)ev.A).ToString(), heavy ? HeavyCol : Ink.Line, heavy ? 30 : 22);
-                Stains.Drops(pos, struck != null ? KindColor(struck.Kind) : Ink.Line, a, heavy ? 6 : 3);
+                Stains.Drops(pos, struck is { } sk ? KindColor(sk) : Ink.Line, a, heavy ? 6 : 3);
                 Shake(heavy ? 0.32f : 0.14f);
                 Kick(a, heavy ? 16f : 6f);
                 if (heavy && p.HeavySwing && p.Weapon.FullCharge(p.Charge)) Hud.Flash(new Color(1f, 0.9f, 0.7f), 0.12f);

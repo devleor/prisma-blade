@@ -26,11 +26,12 @@ public static class Settings
         var cfg = new ConfigFile();
         if (Persist && cfg.Load(Path) == Error.Ok)
         {
-            Master = (float)cfg.GetValue("audio", "master", Master);
-            Music = (float)cfg.GetValue("audio", "music", Music);
-            Effects = (float)cfg.GetValue("audio", "effects", Effects);
-            Shake = (float)cfg.GetValue("video", "shake", Shake);
-            Fullscreen = (bool)cfg.GetValue("video", "fullscreen", Fullscreen);
+            Master = Unit(cfg, "audio", "master", Master);
+            Music = Unit(cfg, "audio", "music", Music);
+            Effects = Unit(cfg, "audio", "effects", Effects);
+            Shake = Unit(cfg, "video", "shake", Shake);
+            var fs = cfg.GetValue("video", "fullscreen", Fullscreen);
+            Fullscreen = fs.VariantType == Variant.Type.Bool ? fs.AsBool() : Fullscreen;
         }
         Apply();
     }
@@ -59,6 +60,16 @@ public static class Settings
             }
     }
 
+    /// <summary>A 0..1 value from the file; a hand-edited or broken entry falls back to the default.</summary>
+    static float Unit(ConfigFile cfg, string section, string key, float fallback)
+    {
+        var v = cfg.GetValue(section, key, fallback);
+        float f = v.VariantType switch { Variant.Type.Float => (float)v.AsDouble(), Variant.Type.Int => v.AsInt32(), _ => fallback };
+        return float.IsFinite(f) ? Mathf.Clamp(f, 0f, 1f) : fallback;
+    }
+
+    static bool? appliedFullscreen;
+
     static float Db(float v) => v <= 0.001f ? -80f : Mathf.LinearToDb(v);
 
     public static void Apply()
@@ -67,7 +78,10 @@ public static class Settings
         AudioServer.SetBusVolumeDb(0, Db(Master));
         AudioServer.SetBusVolumeDb(AudioServer.GetBusIndex(MusicBus), Db(Music));
         AudioServer.SetBusVolumeDb(AudioServer.GetBusIndex(SfxBus), Db(Effects));
-        if (DisplayServer.GetName() != "headless")
+        if (DisplayServer.GetName() != "headless" && appliedFullscreen != Fullscreen) // leave a maximized window alone
+        {
+            appliedFullscreen = Fullscreen;
             DisplayServer.WindowSetMode(Fullscreen ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Windowed);
+        }
     }
 }

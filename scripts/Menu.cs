@@ -72,7 +72,7 @@ public partial class Menu : Control
         else if (e.IsActionPressed("ui_left") || e.IsActionPressed(Controls.Left)) { Adjust(-1); Accept(); }
         else if (e.IsActionPressed("ui_right") || e.IsActionPressed(Controls.Right)) { Adjust(1); Accept(); }
         else if (e.IsActionPressed("ui_accept")) { Confirm(); Accept(); }
-        else if (e.IsActionPressed("ui_cancel")) { Cancel(); Accept(); }
+        else if (e.IsActionPressed("ui_cancel") || e.IsActionPressed(Controls.Pause)) { Cancel(); Accept(); }
         else if (e is InputEventMouseMotion mm)
         {
             int i = ItemAt(mm.Position);
@@ -83,7 +83,7 @@ public partial class Menu : Control
             int i = ItemAt(mb.Position);
             if (i < 0) return;
             Selected = i;
-            if (IsSlider(i)) SetSlider(i, Mathf.Clamp((mb.Position.X - SliderX0) / SliderW, 0f, 1f));
+            if (IsSliderItem(i)) SetSlider(i, Mathf.Clamp((mb.Position.X - SliderX0) / SliderW, 0f, 1f));
             else Confirm();
             Accept();
         }
@@ -214,7 +214,8 @@ public partial class Menu : Control
             if (f.life <= 0f)
             {
                 flicks.RemoveAt(i);
-                stains.Add((Ink.Blob(f.pos, f.r * 1.6f, f.r, f.vel.Angle(), stains.Count * 31 + 5, 0.25f, 10), new Color(Red.R * 0.8f, Red.G, Red.B, 0.45f)));
+                var blot = Ink.Blob(f.pos, f.r * 1.6f, f.r, f.vel.Angle(), stains.Count * 31 + 5, 0.25f, 10);
+                if (Geometry2D.TriangulatePolygon(blot).Length > 0) stains.Add((blot, new Color(Red.R * 0.8f, Red.G, Red.B, 0.45f)));
                 if (stains.Count > 160) stains.RemoveAt(0);
             }
             else flicks[i] = f;
@@ -228,7 +229,7 @@ public partial class Menu : Control
     Vector2 Center => Size / 2f;
     float ItemsTop => Current == Page.Settings ? Size.Y * 0.36f : Size.Y * 0.58f;
     float Spacing => Current == Page.Settings ? 56f : 64f;
-    Vector2 ItemCenter(int i) => new(Current == Page.Settings ? Size.X * 0.36f : Center.X, ItemsTop + i * Spacing);
+    public Vector2 ItemCenter(int i) => new(Current == Page.Settings ? Size.X * 0.36f : Center.X, ItemsTop + i * Spacing);
     float SliderX0 => Size.X * 0.5f;
     float SliderW => Size.X * 0.28f;
     Vector2 SliderKnob(int i) => new(SliderX0 + SliderW * SliderValue(i), ItemCenter(i).Y - 10f);
@@ -259,7 +260,7 @@ public partial class Menu : Control
             ? new Rect2(size.X * 0.2f, size.Y * 0.1f, size.X * 0.6f, size.Y * 0.8f)
             : new Rect2(-40, -40, size.X + 80, size.Y + 80);
         DrawPaper(page);
-        foreach (var (pts, col) in stains) if (Geometry2D.TriangulatePolygon(pts).Length > 0) DrawColoredPolygon(pts, col);
+        foreach (var (pts, col) in stains) DrawColoredPolygon(pts, col); // only shapes that triangulate are kept
         if (!Paused && Current == Page.Title) DrawSword(new Vector2(size.X * 0.84f, size.Y * 0.52f));
 
         if (Current == Page.Settings) DrawHeader("設定", "CONFIGURAÇÕES", size.Y * 0.2f, 0.55f);

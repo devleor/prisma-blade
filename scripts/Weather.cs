@@ -93,7 +93,7 @@ public partial class Weather : Node2D
             {
                 brown = Mathf.Clamp(brown + w * 0.03f, -1f, 1f);
                 s += brown * thunder * 1.4f;
-                thunder *= 0.99993f;
+                thunder *= 0.99979f; // under 0.001 after ~1.5 s at 22 kHz
             }
             s = Mathf.Clamp(s * vol, -1f, 1f);
             pb.PushFrame(new Vector2(s, s));
@@ -115,6 +115,7 @@ public partial class Weather : Node2D
         if (kind == Kind) return;
         Kind = kind;
         drops.Clear(); splashes.Clear();
+        thunder = 0f;
         int n = kind switch { Sky.Rain => 230, Sky.Drizzle => 110, Sky.Ash => 120, Sky.Motes => 60, _ => 0 };
         for (int i = 0; i < n; i++) drops.Add(Spawn(true));
         nextFlash = rng.RandfRange(6f, 12f);
@@ -236,7 +237,11 @@ public partial class Weather : Node2D
                         float flick = 0.6f + 0.4f * Mathf.Sin(t * 12f + d.Seed);
                         DrawCircle(d.Pos, 1.8f, new Color(1.9f * flick, 0.7f * flick, 0.25f, 0.9f));
                     }
-                    else DrawColoredPolygon(Ink.Blob(d.Pos, d.Len, d.Len * 0.7f, d.Seed, (int)d.Seed, 0.2f, 6), new Color(0.55f, 0.53f, 0.52f, 0.6f));
+                    else // a flake: a small tumbling sliver, no polygon to build per frame
+                    {
+                        var r = Vector2.FromAngle(t * 1.5f + d.Seed) * d.Len;
+                        DrawLine(d.Pos - r, d.Pos + r, new Color(0.55f, 0.53f, 0.52f, 0.6f), d.Len * 0.9f);
+                    }
                 }
                 break;
             case Sky.Motes:

@@ -56,8 +56,9 @@ public class BigEnemyTests
         var ogre = Dummy(w, EKind.Ogre, new Vector2(0f, -130f));
         ogre.AttackCd = 0f;
         Run(w, 24); // it has committed its aim
-        Run(w, 30, new Inputs { Move = new Vector2(1f, 0f) });
-        Assert.True(w.Player.Hp == 100, $"hp {w.Player.Hp} pos {w.Player.Pos} ogre {ogre.Pos} aim {ogre.Aim} st {ogre.State} t {ogre.T}");
+        var ev = Run(w, World.OgreWindup + 4 - 24 + 10, new Inputs { Move = new Vector2(1f, 0f) });
+        Assert.Contains(ev, x => x.Kind == Ev.Slam); // the club did come down...
+        Assert.Equal(100, w.Player.Hp);              // ...where the player no longer was
     }
 
     [Fact]

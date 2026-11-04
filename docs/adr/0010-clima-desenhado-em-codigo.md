@@ -8,7 +8,7 @@ A chuva do Ecos da Fenda é feita em código, sem arte de terceiros; o usuário 
 
 ## Decisão
 - `scripts/Weather.cs` (`Node2D`, ZIndex 50) desenha o clima do bioma:
-  - Chuva: traços de caneta inclinados pelo vento, que viram um anelzinho com respingos no chão. Na floresta há relâmpago (flash e tremor) a cada 8–16 s.
+  - Chuva: traços de caneta inclinados pelo vento, que viram um anelzinho com respingos no chão. Na floresta há relâmpago (flash e tremor): o primeiro após 6–12 s, depois a cada 8–16 s, com trovão sintetizado que dura ~1,5 s.
   - Garoa no pântano.
   - Cinza caindo e brasas HDR subindo nas cavernas.
   - Pontos de luz no cristal.

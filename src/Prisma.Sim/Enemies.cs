@@ -504,7 +504,7 @@ public sealed partial class World
                 if (!e.Hittable || Vector2.Distance(e.Pos, b.To) > b.Radius + e.Radius) continue;
                 if (b.Friendly) e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + 1);
                 Damage(e, b.Damage, Tune.Norm(e.Pos - b.To), 380f, 20f, 30f, byPlayer: b.Friendly);
-                Emit(Ev.Hit, e.Pos, b.Damage, 1);
+                Emit(Ev.Hit, e.Pos, b.Damage, 1, (int)e.Kind);
             }
             if (!b.Friendly && Player.Alive && Vector2.Distance(Player.Pos, b.To) < b.Radius + Tune.PlayerRadius)
                 HurtPlayer(b.Damage, b.To, null);
@@ -548,7 +548,7 @@ public sealed partial class World
                     if (!e.Hittable || Vector2.Distance(e.Pos, pr.Pos) > e.Radius + pr.Radius) continue;
                     e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + 1);
                     Damage(e, pr.Damage, Tune.Norm(pr.Vel), 200f, 14f, 14f);
-                    Emit(Ev.Hit, e.Pos, pr.Damage, 0);
+                    Emit(Ev.Hit, e.Pos, pr.Damage, 0, (int)e.Kind);
                     gone = true;
                     break;
                 }

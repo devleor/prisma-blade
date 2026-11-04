@@ -163,7 +163,8 @@ public enum Ev
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>
-public readonly record struct GameEvent(Ev Kind, Vector2 Pos, float A = 0f, int I = 0);
+/// <summary>K: the kind of the enemy involved, when there is one (Hit), else -1.</summary>
+public readonly record struct GameEvent(Ev Kind, Vector2 Pos, float A = 0f, int I = 0, int K = -1);
 
 /// <summary>Intermission: the pause before a wave. Explore: the room is clear, its gates open (and its altars up).</summary>
 public enum Phase { Intermission, Fighting, Explore, Won, Lost }

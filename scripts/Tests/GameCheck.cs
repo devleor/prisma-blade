@@ -139,8 +139,8 @@ public partial class GameCheck : Node
                 menu.Cancel();
                 Check(menu.Current == Menu.Page.Title, "Esc goes back from settings");
                 Check(menu.Selected == 0, "back on the title page the choice is JOGAR again");
-                menu.Confirm();
-                Check(menu.LastAction == "play", "JOGAR starts the game");
+                menu._Input(new InputEventMouseButton { Pressed = true, ButtonIndex = MouseButton.Left, Position = menu.ItemCenter(0) + new Vector2(0, -10) });
+                Check(menu.LastAction == "play", "clicking JOGAR with the mouse starts the game");
                 Settings.Effects = effectsBefore; Settings.Shake = shakeBefore; Settings.Apply();
                 GD.Print(failures == 0 ? "PASSED" : $"FAILED ({failures})");
                 GetTree().Quit(failures == 0 ? 0 : 1);

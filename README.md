@@ -14,7 +14,8 @@ de pedra vista inteira de cima; triângulos, círculos, hexágonos e um Monólit
 | Dash | Espaço / Shift | A / RB |
 | Estilhaçar (gasta 50 de foco) | Q / E / L | B / RT |
 | Giro especial (custa 10 de vida) | F / botão do meio | LB |
-| Reiniciar | R / Enter | Start |
+| Reiniciar | R | Back |
+| Pausa | Esc | Start |
 
 ## Mecânicas
 
