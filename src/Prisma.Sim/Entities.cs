@@ -54,7 +54,7 @@ public sealed class Player
     public bool Invulnerable => Invuln > 0 || (State == PState.Dash && T <= Tune.DashIFrames);
 }
 
-public enum EKind { Spike, Orb, Bastion, Monolith }
+public enum EKind { Spike, Orb, Bastion, Monolith, Imp, Bomber, Shield }
 
 public enum EState { Spawn, Idle, Telegraph, Act, Recover, Stun, Dead }
 
@@ -90,6 +90,9 @@ public sealed class Enemy
             EKind.Spike => (40, 16f, 150f, 0f),
             EKind.Orb => (30, 15f, 120f, 0f),
             EKind.Bastion => (130, 28f, 85f, 40f),
+            EKind.Imp => (16, 11f, 210f, 0f),
+            EKind.Bomber => (45, 18f, 95f, 0f),
+            EKind.Shield => (70, 20f, 105f, 25f),
             _ => (700, 46f, 70f, 90f),
         };
         e.MaxHp = e.Hp;
@@ -115,6 +118,21 @@ public enum RoomKind { Fight, Elite, Boss }
 /// <summary>One room of a run: what it spawns. In an elite room the first enemy is the elite.</summary>
 public sealed record Room(RoomKind Kind, EKind[] Enemies);
 
+/// <summary>
+/// A bomb lobbed in an arc from From to To over Flight frames; it bursts on landing and hurts everyone in Radius.
+/// The sword can bat one back mid-air: then it flies at the nearest enemy and only hurts enemies.
+/// </summary>
+public sealed class Bomb
+{
+    public Vector2 From, To;
+    public float T, Flight = 46f, Radius = 75f;
+    public int Damage = 14;
+    public bool Friendly;
+    public Vector2 Ground => Vector2.Lerp(From, To, Math.Clamp(T / Flight, 0f, 1f));
+    /// <summary>Height above the ground, 0..1, for drawing the arc.</summary>
+    public float Height => 4f * (T / Flight) * (1f - T / Flight);
+}
+
 public sealed class Proj
 {
     public Vector2 Pos, Vel;
@@ -129,6 +147,8 @@ public enum Ev
     Telegraph, Slam, ChargeFull, WaveStart, WaveClear, Victory, Defeat, Charge, WallHit, Bowl,
     /// <summary>Altars rose after a room (I = how many). Then Reward: one was taken (I = its index), Burn: a burn tick.</summary>
     Altars, Reward, Burn, Heal,
+    /// <summary>Block: a shield turned a cut aside. Lob: a bomb was thrown. Explode: one burst (A = radius, I = 1 if batted back).</summary>
+    Block, Lob, Explode,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>

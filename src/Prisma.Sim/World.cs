@@ -50,6 +50,7 @@ public sealed partial class World
         foreach (var e in Enemies.ToArray()) StepEnemy(e, ts);
         Separate();
         StepProjs(ts);
+        StepBombs(ts);
         Enemies.RemoveAll(e => !e.Alive);
         StepWaves();
     }
@@ -264,6 +265,8 @@ public sealed partial class World
             AddFocus(5f);
             Emit(Ev.Deflect, pr.Pos);
         }
+        foreach (var b in Bombs)
+            if (!b.Friendly && b.T < b.Flight - 2f && InArc(b.Ground, 14f, s.Reach, lo, hi)) BatBomb(b);
         if (Phase == Phase.Reward)
             for (int i = 0; i < Altars.Count; i++)
                 if (InArc(Altars[i].Pos, Altar.Radius, s.Reach, lo, hi)) { TakeAltar(i); break; }
@@ -288,6 +291,16 @@ public sealed partial class World
         bool heavy = p.HeavySwing;
         var dir = Tune.Norm(e.Pos - p.Pos);
         if (dir == Vector2.Zero) dir = Tune.Dir(p.Facing);
+        if (!heavy && Guards(e, p.Pos))
+        {
+            // the shield takes it: no damage, the blade bounces and the player is pushed back a little
+            e.Flash = 3f;
+            e.Vel += dir * 60f;
+            p.Vel = -dir * 260f;
+            Hitstop = Math.Max(Hitstop, 2);
+            Emit(Ev.Block, e.Pos - dir * e.Radius, 0f, 0);
+            return;
+        }
         float mul = p.DamageMul;
         bool echo = p.EchoReady;
         if (echo) { mul *= 2f; p.EchoReady = false; }

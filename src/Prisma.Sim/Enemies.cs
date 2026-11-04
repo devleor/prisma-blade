@@ -9,6 +9,9 @@ namespace Prisma.Sim;
 ///   Orb (circle): keeps its distance and fires a 3-shot spread.
 ///   Bastion (hexagon): armoured, slow, slams the ground around it.
 ///   Monolith (diamond, boss): charge chains, radial bursts, summons Spikes; faster below half health.
+///   Imp: small and fast, comes in numbers, hops at the player.
+///   Bomber: keeps away and lobs bombs at where the player is; the landing spot is marked; bombs hurt enemies too.
+///   Shield: a shield toward the player stops light cuts from the front; flank it, use the heavy, or shatter it.
 /// </summary>
 public sealed partial class World
 {
@@ -30,11 +33,12 @@ public sealed partial class World
     /// <summary>Which enemies may appear, from which room on, and how much of a room's budget each costs.</summary>
     static readonly (EKind Kind, int From, float Cost)[] Pool =
     [
-        (EKind.Spike, 0, 1f), (EKind.Orb, 1, 1f), (EKind.Bastion, 2, 2.5f),
+        (EKind.Spike, 0, 1f), (EKind.Imp, 0, 0.5f), (EKind.Orb, 1, 1f), (EKind.Bomber, 2, 1.5f),
+        (EKind.Bastion, 2, 2.5f), (EKind.Shield, 3, 2f),
     ];
 
     /// <summary>The kinds that can lead an elite room.</summary>
-    static readonly EKind[] EliteKinds = [EKind.Spike, EKind.Bastion, EKind.Orb];
+    static readonly EKind[] EliteKinds = [EKind.Spike, EKind.Bastion, EKind.Orb, EKind.Shield, EKind.Bomber];
 
     public static List<Room> MakeRun(uint seed)
     {
@@ -95,6 +99,7 @@ public sealed partial class World
         }
         if (Enemies.Count > 0 || ChainRunning) return;
         Projs.RemoveAll(pr => !pr.Friendly); // stale shots must not hit during the pause or after victory
+        Bombs.RemoveAll(b => !b.Friendly);
         if (Wave >= Rooms.Count - 1)
         {
             Phase = Phase.Won;
@@ -210,6 +215,9 @@ public sealed partial class World
                     case EKind.Orb: OrbAi(e, dir, dist, dt); break;
                     case EKind.Bastion: BastionAi(e, dir, dist, dt); break;
                     case EKind.Monolith: MonolithAi(e, dir, dist, dt); break;
+                    case EKind.Imp: ImpAi(e, dir, dist, dt); break;
+                    case EKind.Bomber: BomberAi(e, dir, dist, dt); break;
+                    case EKind.Shield: ShieldAi(e, dir, dist, dt); break;
                 }
                 break;
         }
@@ -377,6 +385,152 @@ public sealed partial class World
                 if (e.T >= (p2 ? 40f : 60f)) { Go(e, EState.Idle); e.StrafeSign = -e.StrafeSign; }
                 break;
         }
+    }
+
+    void ImpAi(Enemy e, Vector2 dir, float dist, float dt)
+    {
+        switch (e.State)
+        {
+            case EState.Idle:
+                var side = new Vector2(-dir.Y, dir.X) * e.StrafeSign;
+                float wobble = MathF.Sin(e.T * 0.15f + e.Id);
+                Seek(e, (dir * 0.75f + side * (0.5f + 0.4f * wobble)) * e.Speed, dt);
+                if (dist < 125f && e.AttackCd <= 0f) Telegraph(e);
+                break;
+            case EState.Telegraph:
+                Slow(e, 12f, dt);
+                if (e.T < 10f) e.Aim = dir;
+                if (e.T >= 14f) { Go(e, EState.Act); e.HitPlayerThisAct = false; }
+                break;
+            case EState.Act:
+                e.Vel = e.Aim * 640f * (1f - e.T / 30f); // about 130 px: reaches from where it decides to hop
+                Contact(e, 6);
+                if (e.T >= 18f) Go(e, EState.Recover);
+                break;
+            case EState.Recover:
+                Slow(e, 7f, dt);
+                if (e.T >= 24f) { Go(e, EState.Idle); e.AttackCd = Rng.Range(40f, 80f); e.StrafeSign = -e.StrafeSign; }
+                break;
+        }
+    }
+
+    public const int BomberWindup = 34;
+
+    void BomberAi(Enemy e, Vector2 dir, float dist, float dt)
+    {
+        switch (e.State)
+        {
+            case EState.Idle:
+                var side = new Vector2(-dir.Y, dir.X) * e.StrafeSign;
+                var want = dist < 300f ? -dir : dist > 460f ? dir : side;
+                Seek(e, want * e.Speed, dt);
+                if (e.AttackCd <= 0f && dist < 620f) Telegraph(e);
+                break;
+            case EState.Telegraph:
+                Slow(e, 9f, dt);
+                e.Aim = dir;
+                if (e.T >= BomberWindup)
+                {
+                    var lead = Player.Pos + Player.Vel * 0.35f; // aims a little ahead of a moving player
+                    int n = e.Elite ? 3 : 1;
+                    for (int i = 0; i < n; i++)
+                    {
+                        var off = i == 0 ? Vector2.Zero : Tune.Dir(Tune.Angle(dir) + (i == 1 ? 1.6f : -1.6f)) * 110f;
+                        Bombs.Add(new Bomb { From = e.Pos, To = Tune.Clamp(lead + off, 20f) });
+                    }
+                    Emit(Ev.Lob, e.Pos, 0f, n);
+                    Go(e, EState.Recover);
+                }
+                break;
+            case EState.Recover:
+                Slow(e, 6f, dt);
+                if (e.T >= 30f) { Go(e, EState.Idle); e.AttackCd = Rng.Range(100f, 150f); e.StrafeSign = -e.StrafeSign; }
+                break;
+        }
+    }
+
+    /// <summary>How far (radians) to either side of its aim the shield covers.</summary>
+    public const float ShieldCover = 1.2f;
+    const float ShieldTurn = 2.4f; // radians per second: fast footwork beats it
+
+    /// <summary>True when the shield stands between this enemy and a blow coming from <paramref name="from"/>.</summary>
+    public static bool Guards(Enemy e, Vector2 from)
+    {
+        if (e.Kind != EKind.Shield || e.State is EState.Stun or EState.Spawn or EState.Recover) return false;
+        var d = from - e.Pos;
+        if (d.LengthSquared() < 1e-4f) return true;
+        return MathF.Abs(Tune.Wrap(Tune.Angle(d) - Tune.Angle(e.Aim))) < ShieldCover;
+    }
+
+    void ShieldAi(Enemy e, Vector2 dir, float dist, float dt)
+    {
+        if (e.Aim == Vector2.Zero) e.Aim = dir;
+        if (e.State is EState.Idle or EState.Telegraph)
+        {
+            float a = Tune.Angle(e.Aim), want = Tune.Angle(dir);
+            float step = Math.Clamp(Tune.Wrap(want - a), -ShieldTurn * dt, ShieldTurn * dt);
+            e.Aim = Tune.Dir(a + step);
+        }
+        switch (e.State)
+        {
+            case EState.Idle:
+                Seek(e, dir * e.Speed * (dist > 90f ? 1f : 0.2f), dt);
+                if (dist < 115f && e.AttackCd <= 0f) Telegraph(e);
+                break;
+            case EState.Telegraph:
+                Slow(e, 10f, dt);
+                if (e.T >= 26f) { Go(e, EState.Act); e.HitPlayerThisAct = false; }
+                break;
+            case EState.Act:
+                e.Vel = e.Aim * 600f * (1f - e.T / 20f);
+                Contact(e, 10);
+                if (e.T >= 10f) Go(e, EState.Recover);
+                break;
+            case EState.Recover: // the bash leaves it open: shield down
+                Slow(e, 6f, dt);
+                if (e.T >= 40f) { Go(e, EState.Idle); e.AttackCd = Rng.Range(50f, 90f); }
+                break;
+        }
+    }
+
+    public readonly List<Bomb> Bombs = [];
+
+    void StepBombs(float ts)
+    {
+        for (int i = Bombs.Count - 1; i >= 0; i--)
+        {
+            var b = Bombs[i];
+            b.T += b.Friendly ? 1f : ts;
+            if (b.T < b.Flight) continue;
+            Bombs.RemoveAt(i);
+            Emit(Ev.Explode, b.To, b.Radius, b.Friendly ? 1 : 0);
+            Hitstop = Math.Max(Hitstop, 3);
+            foreach (var e in Enemies.ToArray())
+            {
+                if (!e.Hittable || Vector2.Distance(e.Pos, b.To) > b.Radius + e.Radius) continue;
+                if (b.Friendly) e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + 1);
+                Damage(e, b.Damage, Tune.Norm(e.Pos - b.To), 380f, 20f, 30f, byPlayer: b.Friendly);
+                Emit(Ev.Hit, e.Pos, b.Damage, 1);
+            }
+            if (!b.Friendly && Player.Alive && Vector2.Distance(Player.Pos, b.To) < b.Radius + Tune.PlayerRadius)
+                HurtPlayer(b.Damage, b.To, null);
+        }
+    }
+
+    /// <summary>The sword bats a bomb back: it flies at the nearest enemy (or straight on) and hits harder.</summary>
+    void BatBomb(Bomb b)
+    {
+        var p = Player;
+        var at = b.Ground;
+        var target = Enemies.Where(e => e.Hittable).OrderBy(e => Vector2.DistanceSquared(e.Pos, at)).FirstOrDefault();
+        b.Friendly = true;
+        b.From = at;
+        b.To = target?.Pos ?? Tune.Clamp(at + Tune.Dir(p.Facing) * 260f, 20f);
+        b.T = 0f;
+        b.Flight = 28f;
+        b.Damage = 24;
+        AddFocus(6f);
+        Emit(Ev.Deflect, at);
     }
 
     void Fire(Vector2 pos, float angle, float speed, int dmg) =>

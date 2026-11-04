@@ -53,7 +53,10 @@ public class RunTests
     }
 
     /// <summary>A room's weight: what it would have cost from the generator's budget.</summary>
-    static float Weight(Room r) => r.Enemies.Sum(k => k switch { EKind.Bastion => 2.5f, EKind.Monolith => 10f, _ => 1f });
+    static float Weight(Room r) => r.Enemies.Sum(k => k switch
+    {
+        EKind.Bastion => 2.5f, EKind.Shield => 2f, EKind.Bomber => 1.5f, EKind.Imp => 0.5f, EKind.Monolith => 10f, _ => 1f,
+    });
 
     // ---------------------------------------------------------------- the run
 
@@ -80,8 +83,8 @@ public class RunTests
         for (uint seed = 1; seed <= 30; seed++)
         {
             var run = World.MakeRun(seed);
-            Assert.All(run[0].Enemies, k => Assert.Equal(EKind.Spike, k));
-            Assert.DoesNotContain(EKind.Bastion, run[1].Enemies);
+            Assert.All(run[0].Enemies, k => Assert.Contains(k, new[] { EKind.Spike, EKind.Imp }));
+            Assert.All(run[1].Enemies, k => Assert.Contains(k, new[] { EKind.Spike, EKind.Imp, EKind.Orb }));
             Assert.True(Weight(run[5]) > Weight(run[0]) + 4f, $"seed {seed}: {Weight(run[0])} -> {Weight(run[5])}");
             Assert.All(run.Take(World.RunLength - 1), r => Assert.DoesNotContain(EKind.Monolith, r.Enemies));
         }
