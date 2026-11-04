@@ -111,6 +111,7 @@ public partial class GameCheck : Node
                     main.React(new GameEvent(Ev.Crit, at, 18f, 0, (int)EKind.Bastion));
                     main.React(new GameEvent(Ev.Hit, at, 18f, 0, (int)EKind.Bastion));
                     Check(main.Fx.Count > fxBefore, "a critical hit shows its number and burst");
+                    Check(main.Stains.Cuts > 0, "the blade leaves a cut on the floor where it struck");
                     bool impactWas = Settings.ImpactFrames;
                     Settings.ImpactFrames = false;
                     main.React(new GameEvent(Ev.GuardBreak, at, 40f, (int)EKind.Ogre));
@@ -163,6 +164,7 @@ public partial class GameCheck : Node
             case 330:
                 Check(menu!.StainCount > 0, $"choosing flicks ink that stays on the page ({menu.StainCount})");
                 Check(!main.KillCamOn && Engine.TimeScale == 1.0, "and time runs normally again after it");
+                Check(main.Stains.Cuts > 0, "cuts stay on the floor for a while");
                 menu.Cancel();
                 Check(menu.Current == Menu.Page.Title, "Esc goes back from settings");
                 Check(menu.Selected == 0, "back on the title page the choice is JOGAR again");

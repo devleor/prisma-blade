@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -109,7 +110,14 @@ public static class InkBatch
             {
                 int ia = ear[(k + ear.Count - 1) % ear.Count], ib = ear[k], ic = ear[(k + 1) % ear.Count];
                 Vector2 pa = pts[ia], pb = pts[ib], pc = pts[ic];
-                if ((pb - pa).Cross(pc - pb) * sign <= 0f) continue; // reflex corner
+                float turn = (pb - pa).Cross(pc - pb) * sign;
+                if (MathF.Abs(turn) < 1e-5f && (pb - pa).Dot(pc - pb) >= 0f)
+                {
+                    ear.RemoveAt(k); // a point on a straight edge adds no area: drop it
+                    cut = true;
+                    break;
+                }
+                if (turn <= 0f) continue; // reflex corner
                 bool inside = false;
                 foreach (int j in ear)
                 {

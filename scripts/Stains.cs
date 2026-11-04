@@ -25,7 +25,28 @@ public partial class Stains : Node2D
 
     public int Count => stains.Count;
 
-    public override void _Ready() => ShowBehindParent = true;
+    public override void _Ready()
+    {
+        ShowBehindParent = true;
+        AddChild(cutLayer = new CutLayer(this));
+    }
+
+    CutLayer cutLayer = null!;
+
+    /// <summary>The cuts fade every frame; on their own layer they do not make the dried stains redraw.</summary>
+    sealed partial class CutLayer(Stains owner) : Node2D
+    {
+        public CutLayer() : this(null!) { }
+
+        public override void _Draw()
+        {
+            long t = Prof.Begin();
+            InkBatch.Begin(this);
+            owner.DrawCuts();
+            InkBatch.End();
+            Prof.End("draw:cuts", t);
+        }
+    }
 
     /// <summary>A big splat: a lumpy blob with drops thrown out along <paramref name="dir"/> (radians).</summary>
     public void Splat(Vector2 pos, float size, Color col, float dir, int drops = 6)
@@ -65,13 +86,59 @@ public partial class Stains : Node2D
         }
     }
 
-    public void Clear() { stains.Clear(); dirty = true; }
+    // ---------------------------------------------------------------- sword cuts
+
+    struct CutMark { public Vector2 Pos, Dir; public float Len, Width, Bend, Age; public bool Red; }
+    readonly List<CutMark> cuts = [];
+    /// <summary>How long a cut stays on the floor (seconds), the last part spent fading.</summary>
+    public const float CutLife = 7f, CutFade = 2.5f, CutGrow = 0.07f;
+    public const int MaxCuts = 40;
+
+    public int Cuts => cuts.Count;
+
+    /// <summary>A gash scored into the floor where a blade struck, across the swing (<paramref name="angle"/>):
+    /// it is drawn in a flash, stays a while and fades. Crits cut red.</summary>
+    public void Cut(Vector2 pos, float angle, bool heavy, bool crit)
+    {
+        float len = (heavy ? 92f : 58f) * rng.RandfRange(0.85f, 1.15f);
+        cuts.Add(new CutMark
+        {
+            Pos = pos, Dir = Vector2.FromAngle(angle + rng.RandfRange(-0.3f, 0.3f)), Len = len,
+            Width = heavy ? 7f : 4.5f, Bend = rng.RandfRange(-0.18f, 0.18f) * len, Red = crit,
+        });
+        if (cuts.Count > MaxCuts) cuts.RemoveAt(0);
+        cutLayer?.QueueRedraw();
+    }
+
+    /// <summary>A lens: sharp at both ends, widest in the middle, bowed a little like a real slash.</summary>
+    static Vector2[] Gash(Vector2 c, Vector2 dir, float len, float width, float bend, float shown)
+    {
+        const int n = 9;
+        var side = dir.Orthogonal();
+        float l = len * shown; // the cut grows from its start while the blade passes
+        var start = c - dir * len * 0.5f;
+        Vector2 Mid(float u) => start + dir * (u * l) + side * bend * shown * (1f - 4f * (u - 0.5f) * (u - 0.5f));
+        // one shared point at each tip, then the two edges between them (no repeated points: they break triangulation)
+        var pts = new Vector2[2 * n - 2];
+        pts[0] = Mid(0f);
+        pts[n - 1] = Mid(1f);
+        for (int i = 1; i < n - 1; i++)
+        {
+            float u = i / (float)(n - 1), w = width * Mathf.Sin(Mathf.Pi * u) * 0.5f;
+            pts[i] = Mid(u) + side * w;
+            pts[2 * n - 2 - i] = Mid(u) - side * w * 0.6f;
+        }
+        return pts;
+    }
+
+    public void Clear() { stains.Clear(); cuts.Clear(); cutLayer?.QueueRedraw(); dirty = true; }
 
     /// <summary>Switches to the stains of another room (each room keeps its own).</summary>
     public void Show(int floor, int x, int y)
     {
         if (!rooms.TryGetValue((floor, x, y), out var list)) rooms[(floor, x, y)] = list = [];
         stains = list;
+        cuts.Clear(); cutLayer?.QueueRedraw(); // cuts are fresh marks of this fight, they do not wait for you in another room
         dirty = true;
     }
 
@@ -88,6 +155,16 @@ public partial class Stains : Node2D
 
     public override void _Process(double delta)
     {
+        if (cuts.Count > 0)
+        {
+            for (int i = cuts.Count - 1; i >= 0; i--)
+            {
+                var c = cuts[i];
+                c.Age += (float)delta;
+                if (c.Age >= CutLife) cuts.RemoveAt(i); else cuts[i] = c;
+            }
+            cutLayer.QueueRedraw(); // only the cut layer: the dried stains stay as they were
+        }
         if (!dirty) return;
         dirty = false;
         QueueRedraw();
@@ -143,5 +220,20 @@ public partial class Stains : Node2D
     {
         foreach (var s in stains)
             DrawColoredPolygon(s.Pts, s.Col);
+    }
+
+    void DrawCuts()
+    {
+        foreach (var c in cuts)
+        {
+            float shown = Mathf.Clamp(c.Age / CutGrow, 0.05f, 1f);
+            float a = Mathf.Clamp((CutLife - c.Age) / CutFade, 0f, 1f);
+            var ink = c.Red ? new Color(0.55f, 0.04f, 0.03f, 0.75f * a) : new Color(0.08f, 0.06f, 0.05f, 0.7f * a);
+            InkBatch.Polygon(Gash(c.Pos, c.Dir, c.Len, c.Width, c.Bend, shown), ink);
+            // the lip of the cut catches the light: a thin pale line along one side
+            var side = c.Dir.Orthogonal();
+            var lip = Gash(c.Pos + side * (c.Width * 0.55f), c.Dir, c.Len * 0.8f, c.Width * 0.35f, c.Bend, shown);
+            InkBatch.Polygon(lip, new Color(Ink.Paper, 0.45f * a));
+        }
     }
 }

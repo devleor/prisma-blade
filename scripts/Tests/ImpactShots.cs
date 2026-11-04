@@ -48,6 +48,9 @@ public partial class ImpactShots : Node
                 main.React(new GameEvent(Ev.Crit, new V(160f, -60f), 29f, 1, (int)EKind.Bastion));
                 main.React(new GameEvent(Ev.Hit, new V(160f, -60f), 29f, 1, (int)EKind.Bastion));
                 main.React(new GameEvent(Ev.GuardBreak, new V(-220f, -60f), 40f, (int)EKind.Ogre));
+                // a few plain cuts across the floor, light and heavy, to see the marks they leave
+                for (int i = 0; i < 6; i++)
+                    main.React(new GameEvent(Ev.Hit, new V(-120f + i * 60f, 120f + (i % 2) * 40f), 9f, i % 3 == 0 ? 1 : 0, (int)EKind.Spike));
                 break;
             case 46: Save(0); break;
             case 60:

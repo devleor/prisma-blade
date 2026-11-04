@@ -279,6 +279,7 @@ public partial class Main : Node2D
                 }
                 else Fx.Number(pos, ((int)ev.A).ToString(), heavy ? HeavyCol : Ink.Line, heavy ? 30 : 22);
                 Stains.Drops(pos, struck is { } sk ? KindColor(sk) : Ink.Line, a, heavy ? 6 : 3);
+                Stains.Cut(pos, a + Mathf.Pi / 2f, heavy, crit); // the blade scores the floor across its swing
                 Shake(heavy ? 0.32f : 0.14f);
                 Kick(a, heavy ? 16f : 6f);
                 if (heavy && p.HeavySwing && p.Weapon.FullCharge(p.Charge)) Hud.Flash(new Color(1f, 0.9f, 0.7f), 0.12f);

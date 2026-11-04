@@ -18,3 +18,4 @@ Uma decisão por arquivo. Para registrar uma nova, crie `NNNN-titulo.md` com Sta
 | [0012](0012-rfc-002-aprovada.md) | RFC 002 aprovada: cartas, chefes, forja, mais monstros e impacto | 2026-11-04 |
 | [0013](0013-tinta-em-lote.md) | Tinta em lote: uma chamada de desenho por camada, redesenho uma vez por quadro | 2026-11-04 |
 | [0014](0014-impacto-critico-fontes.md) | Impacto: crítico, 破, quadro de impacto, câmera lenta, efeitos de tela e fontes OFL | 2026-11-04 |
+| [0015](0015-cortes-no-chao.md) | Cortes da espada ficam no chão | 2026-11-04 |

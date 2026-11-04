@@ -100,6 +100,7 @@ cabeça de ferro com cinta de latão e um espigão atrás.
 - **Crítico:** número grande em vermelho (`CritCol`) com 会心 em cima. Ele aparece maior e encolhe, e solta um anel vermelho.
 - **Quebra de guarda:** um 破 vermelho carimbado sobre o inimigo, do tamanho dele. Cai grande, assenta e some.
 - **Quadro de impacto:** um quadro em negativo de tinta, em que o claro vira tinta, o escuro vira papel e o vermelho continua vermelho. Aparece no máximo uma vez por segundo, pode ser desligado em Configurações e só dispara nos golpes grandes (crítico pesado, quebra de guarda de inimigo grande ou de sala com poucos inimigos, vitória).
+- **Cortes no chão:** cada golpe risca uma lente curva de tinta cruzando o golpe, com um fio de papel na borda. O corte é vermelho no crítico, fica 7 s e desbota (ADR 0015).
 - **Tela:**
   - tinta respingada nas bordas quando o herói apanha (só nas bordas);
   - vinheta vermelho-escura que pulsa abaixo de 30% de vida;
