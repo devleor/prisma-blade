@@ -20,3 +20,4 @@ Uma decisão por arquivo. Para registrar uma nova, crie `NNNN-titulo.md` com Sta
 | [0014](0014-impacto-critico-fontes.md) | Impacto: crítico, 破, quadro de impacto, câmera lenta, efeitos de tela e fontes OFL | 2026-11-04 |
 | [0015](0015-cortes-no-chao.md) | Cortes da espada ficam no chão | 2026-11-04 |
 | [0016](0016-sons-de-dash-cc0.md) | Sons de dash e de dash perfeito (CC0) | 2026-11-04 |
+| [0017](0017-video-devlog.md) | O vídeo de devlog é filmado pelo próprio jogo (Movie Maker) | 2026-11-04 |

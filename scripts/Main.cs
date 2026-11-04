@@ -25,6 +25,11 @@ public partial class Main : Node2D
 
     /// <summary>Tests aim with this instead of the mouse.</summary>
     public Vector2? AimOverride;
+    /// <summary>When set, the sim's inputs come from here instead of the keyboard and pad (the devlog's autopilot).</summary>
+    public System.Func<Inputs>? Pilot;
+    /// <summary>Extra camera zoom and a shift of its focus, for filmed close-ups (1 and zero in play).</summary>
+    public float ZoomMul = 1f;
+    public Vector2 Focus;
 
     /// <summary>The offers on the altars as they stood last frame (the sim clears them as one is taken).</summary>
     Offer[] lastOffers = [];
@@ -106,7 +111,7 @@ public partial class Main : Node2D
 
         var before = G(p.Pos);
         long simT = Prof.Begin();
-        World.Step(new Inputs
+        World.Step(Pilot?.Invoke() ?? new Inputs
         {
             Move = new V(move.X, move.Y),
             Aim = new V(aim.X, aim.Y),
@@ -149,10 +154,10 @@ public partial class Main : Node2D
             if (now >= killCamUntil) { killCamUntil = 0; Engine.TimeScale = 1.0; }
             else lean = Mathf.Sin(Mathf.Pi * (1f - (killCamUntil - now) / (float)KillCamMs));
         }
-        zoom *= 1f + 0.12f * lean;
+        zoom *= (1f + 0.12f * lean) * ZoomMul;
         Camera.Zoom = new Vector2(zoom, zoom);
         kick = kick.Lerp(Vector2.Zero, 1f - Mathf.Exp(-14f * dt));
-        Camera.Offset = new Vector2(rng.RandfRange(-s, s), rng.RandfRange(-s, s)) + kick + (lastKill - Camera.Position) * 0.35f * lean;
+        Camera.Offset = new Vector2(rng.RandfRange(-s, s), rng.RandfRange(-s, s)) + kick + (lastKill - Camera.Position) * 0.35f * lean + Focus;
     }
 
     public Weather WeatherFx { get; private set; } = null!;

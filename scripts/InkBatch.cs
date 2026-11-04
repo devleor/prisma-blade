@@ -30,7 +30,10 @@ public static class InkBatch
 
     public static bool Active(CanvasItem ci) => item == ci;
 
-    public static void Begin(CanvasItem ci) { Flush(); item = ci; }
+    /// <summary>Off only to film the "before" of the devlog: every stroke goes back to one engine call each.</summary>
+    public static bool Enabled = true;
+
+    public static void Begin(CanvasItem ci) { Flush(); item = Enabled ? ci : null; }
 
     public static void End() { Flush(); item = null; }
 
