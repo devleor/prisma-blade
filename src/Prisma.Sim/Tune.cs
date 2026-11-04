@@ -71,11 +71,12 @@ public static class Moves
         new(8, 7, 20, -2.5f, 2.5f, 128f, 20, 440f, 440f, 5, 1, 22),
     ];
 
-    /// <summary>Heavy slash, scaled by how long it was charged. A full charge adds a second fracture stack.</summary>
     /// <summary>The spin special: a full circle, invulnerable while it turns. Costs health (won back by hitting).</summary>
     public static readonly Swing Spin = new(3, 10, 16, -MathF.PI, MathF.PI, 122f, 18, 120f, 560f, 5, 1, 30);
-    public const int SpinCost = 10, SpinIndex = 4, SpinCooldown = 45;
+    /// <summary>The Swing event's I is the light combo index, or one of these codes (kept above any chain length).</summary>
+    public const int SpinCost = 10, SpinIndex = 9, HeavyIndex = 8, SpinCooldown = 45;
 
+    /// <summary>Heavy slash of the Espada Longa, scaled by how long it was charged. A full charge adds a second fracture stack.</summary>
     public static Swing Heavy(int charge)
     {
         float c = Math.Clamp(charge / (float)Tune.ChargeMax, 0f, 1f);

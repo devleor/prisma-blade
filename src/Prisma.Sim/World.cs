@@ -24,6 +24,8 @@ public sealed partial class World
     {
         if (pillars) Pillars.AddRange(PillarLayout);
         Rng = new Rng(seed);
+        runRng = new Rng(seed * 2654435761u + 1u);
+        Rooms = MakeRun(seed);
         Player.Pos = new Vector2(0f, 120f);
         Player.Facing = -MathF.PI / 2f;
         AutoWaves = waves;
@@ -102,9 +104,9 @@ public sealed partial class World
                 Steer(move, Tune.ChargeSpeedMul);
                 p.Facing = aim;
                 p.BladeAngle = p.Facing - 2.4f;
-                if (p.Charge < Tune.ChargeMax && ++p.Charge == Tune.ChargeMax) Emit(Ev.ChargeFull, p.Pos);
+                if (p.Charge < p.Weapon.ChargeFrames && ++p.Charge == p.Weapon.ChargeFrames) Emit(Ev.ChargeFull, p.Pos);
                 if (p.Buffer == Buffered.Dash && p.DashCd == 0) { StartDash(move); break; }
-                if (!inp.HeavyHeld) StartSwing(Moves.Heavy(p.Charge), heavy: true, combo: 0, aim);
+                if (!inp.HeavyHeld) StartSwing(p.Weapon.Heavy(p.Charge), heavy: true, combo: 0, aim);
                 break;
 
             case PState.Dash:
@@ -164,9 +166,9 @@ public sealed partial class World
                 return true;
             case Buffered.Light:
                 int idx = fromRecovery ? (p.HeavySwing ? 0 : p.Combo + 1) : (p.ComboTimer > 0 ? p.NextCombo : 0);
-                if (idx >= Moves.Light.Length) return false; // the finisher must recover; the press stays buffered
+                if (idx >= p.Weapon.Light.Length) return false; // the finisher must recover; the press stays buffered
                 Consume();
-                StartSwing(Moves.Light[idx], heavy: false, combo: idx, aim);
+                StartSwing(p.Weapon.Light[idx], heavy: false, combo: idx, aim);
                 return true;
         }
         return false;
@@ -202,7 +204,7 @@ public sealed partial class World
         {
             p.SwingId = ++swingCounter;
             p.Vel = Tune.Dir(p.Facing) * s.Lunge + move * Tune.MoveSpeed * Tune.AttackSteer;
-            Emit(Ev.Swing, p.Pos, p.Facing, p.HeavySwing ? (p.Combo == Moves.SpinIndex ? Moves.SpinIndex : 3) : p.Combo);
+            Emit(Ev.Swing, p.Pos, p.Facing, p.HeavySwing ? (p.Combo == Moves.SpinIndex ? Moves.SpinIndex : Moves.HeavyIndex) : p.Combo);
         }
 
         if (p.T <= activeEnd)
@@ -225,7 +227,7 @@ public sealed partial class World
         if (p.T >= s.Total)
         {
             p.State = PState.Free; p.T = 0;
-            p.NextCombo = p.HeavySwing ? 0 : (p.Combo + 1) % Moves.Light.Length;
+            p.NextCombo = p.HeavySwing ? 0 : (p.Combo + 1) % p.Weapon.Light.Length;
             p.ComboTimer = p.NextCombo == 0 ? 0 : Tune.ComboWindow;
         }
     }
@@ -236,7 +238,7 @@ public sealed partial class World
         Consume();
         p.State = PState.Dash; p.T = 0;
         p.DashDir = move.LengthSquared() > 0.04f ? Tune.Norm(move) : Tune.Dir(p.Facing);
-        p.DashCd = Tune.DashCooldown;
+        p.DashCd = p.DashCooldown;
         p.PerfectUsed = false;
         p.Charge = 0;
         Emit(Ev.Dash, p.Pos, Tune.Angle(p.DashDir));
@@ -259,9 +261,12 @@ public sealed partial class World
             pr.Vel = Tune.Norm(pr.Pos - p.Pos) * MathF.Max(520f, pr.Vel.Length() * 1.7f);
             pr.Life = 2f;
             pr.Damage = 14;
-            p.Focus = MathF.Min(Tune.FocusMax, p.Focus + 5f);
+            AddFocus(5f);
             Emit(Ev.Deflect, pr.Pos);
         }
+        if (Phase == Phase.Reward)
+            for (int i = 0; i < Altars.Count; i++)
+                if (InArc(Altars[i].Pos, Altar.Radius, s.Reach, lo, hi)) { TakeAltar(i); break; }
     }
 
     bool InArc(Vector2 pos, float radius, float reach, float lo, float hi)
@@ -283,11 +288,17 @@ public sealed partial class World
         bool heavy = p.HeavySwing;
         var dir = Tune.Norm(e.Pos - p.Pos);
         if (dir == Vector2.Zero) dir = Tune.Dir(p.Facing);
-        Damage(e, s.Damage, dir, s.Knock, s.Poise, heavy ? 28f : 16f);
-        e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + s.Fracture);
-        Hitstop = Math.Max(Hitstop, s.Hitstop);
-        p.Focus = MathF.Min(Tune.FocusMax, p.Focus + (heavy ? 10f : 4f));
-        Emit(Ev.Hit, e.Pos, s.Damage, heavy ? 1 : 0);
+        float mul = p.DamageMul;
+        bool echo = p.EchoReady;
+        if (echo) { mul *= 2f; p.EchoReady = false; }
+        int dmg = Math.Max(1, (int)MathF.Round(s.Damage * mul));
+        int fracture = p.Weapon.FractureEveryHit ? Math.Max(1, s.Fracture) : s.Fracture;
+        if (p.Has(RKind.Brasa) > 0) { e.Burn = Relics.BurnFrames * p.Has(RKind.Brasa); }
+        Damage(e, dmg, dir, s.Knock, s.Poise, heavy ? 28f : 16f);
+        e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + fracture);
+        Hitstop = Math.Max(Hitstop, s.Hitstop + (echo ? 4 : 0));
+        AddFocus(heavy ? 10f : 4f);
+        Emit(Ev.Hit, e.Pos, dmg, heavy || echo ? 1 : 0);
     }
 
     /// <summary>Damage, poise and knockback for any source. Armoured enemies only flinch once their poise breaks.</summary>
@@ -322,10 +333,22 @@ public sealed partial class World
         }
     }
 
+    void AddFocus(float amount) => Player.Focus = MathF.Min(Tune.FocusMax, Player.Focus + amount * Player.FocusMul);
+
+    void HealPlayer(int amount)
+    {
+        var p = Player;
+        if (!p.Alive || amount <= 0 || p.Hp >= p.MaxHp) return;
+        p.Hp = Math.Min(p.MaxHp, p.Hp + amount);
+        p.Recover = Math.Min(p.Recover, p.MaxHp - p.Hp);
+        Emit(Ev.Heal, p.Pos, amount);
+    }
+
     void Kill(Enemy e)
     {
         if (e.State == EState.Dead) return;
         e.State = EState.Dead;
+        HealPlayer(Player.Weapon.KillHeal + Relics.SedeHeal * Player.Has(RKind.Sede));
         Emit(Ev.Kill, e.Pos, e.Radius, (int)e.Kind);
     }
 
@@ -400,7 +423,7 @@ public sealed partial class World
     {
         var p = Player;
         if (!p.Alive || Phase == Phase.Won) return;
-        if (p.State == PState.Dash && p.T <= Tune.PerfectFrames)
+        if (p.State == PState.Dash && p.T <= p.PerfectWindow)
         {
             if (!p.PerfectUsed) PerfectDodge(src);
             return;
@@ -431,13 +454,22 @@ public sealed partial class World
         p.PerfectUsed = true;
         SlowMo = Tune.PerfectSlowFrames;
         Hitstop = Math.Max(Hitstop, 4);
-        p.Focus = MathF.Min(Tune.FocusMax, p.Focus + 25f);
+        AddFocus(25f);
+        if (p.Weapon.Echo) p.EchoReady = true;
         p.Invuln = Math.Max(p.Invuln, Tune.DashFrames + Tune.DashTail + 12);
         p.DashCd = 0;
         if (src is { Hittable: true }) src.Fracture = Math.Min(Tune.MaxFracture, src.Fracture + 1);
         foreach (var e in Enemies)
             if (e.Hittable && Vector2.Distance(e.Pos, p.Pos) < Tune.PerfectMarkRadius + e.Radius)
                 e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + 1);
+        int spikes = Relics.EspinhosDamage * p.Has(RKind.Espinhos);
+        if (spikes > 0)
+            foreach (var e in Enemies.ToArray())
+                if (e.Hittable && Vector2.Distance(e.Pos, p.Pos) < Tune.PerfectMarkRadius + e.Radius)
+                {
+                    Damage(e, spikes, Tune.Norm(e.Pos - p.Pos), 260f, 20f, 24f);
+                    Emit(Ev.Hit, e.Pos, spikes, 1);
+                }
         Emit(Ev.Perfect, p.Pos);
     }
 }

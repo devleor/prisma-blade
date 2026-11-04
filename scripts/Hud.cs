@@ -90,7 +90,7 @@ public partial class Hud : Control
         // wave
         if (w.Wave >= 0)
         {
-            string wave = w.Wave >= World.Waves.Length - 1 ? "CHEFE" : $"ONDA {w.Wave + 1}/{World.Waves.Length - 1}";
+            string wave = w.BossRoom ? "CHEFE" : $"SALA {w.Wave + 1}/{w.Rooms.Count}";
             DrawString(font, new Vector2(0, 36), wave, HorizontalAlignment.Center, size.X, 20, new Color(1, 1, 1, 0.8f));
         }
 

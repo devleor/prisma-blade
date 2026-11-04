@@ -38,6 +38,18 @@ public sealed class Player
     public float BladeAngle, BladeReach = 100f;
     public bool BladeActive;
 
+    /// <summary>The sword in hand and the relics picked up this run (a count per kind: they stack).</summary>
+    public Weapon Weapon = Weapon.Longa;
+    public readonly int[] Relics = new int[Enum.GetValues<RKind>().Length];
+    /// <summary>Katana: a perfect dodge charges the next landed hit to deal double.</summary>
+    public bool EchoReady;
+
+    public int Has(RKind k) => Relics[(int)k];
+    public int PerfectWindow => Tune.PerfectFrames + Weapon.PerfectBonus;
+    public float DamageMul => 1f + Prisma.Sim.Relics.AfiacaoMul * Has(RKind.Afiacao);
+    public float FocusMul => Weapon.FocusGain * (1f + Prisma.Sim.Relics.FocoMul * Has(RKind.Foco));
+    public int DashCooldown => Math.Max(6, (int)MathF.Round(Weapon.DashCooldown * MathF.Pow(Prisma.Sim.Relics.PeLeveMul, Has(RKind.PeLeve))));
+
     public bool Alive => State != PState.Dead;
     public bool Invulnerable => Invuln > 0 || (State == PState.Dash && T <= Tune.DashIFrames);
 }
@@ -60,6 +72,10 @@ public sealed class Enemy
     public bool HitPlayerThisAct;
     public int Mode, Sub, Pattern;
     public float StrafeSign = 1f;
+    /// <summary>Frames of burning left (Brasa relic) and the frame counter toward the next tick.</summary>
+    public int Burn, BurnT;
+    /// <summary>Elite: a bigger, tougher version that leads a room.</summary>
+    public bool Elite;
 
     public bool Alive => State != EState.Dead && Hp > 0;
     public bool Hittable => Alive && State != EState.Spawn;
@@ -81,7 +97,23 @@ public sealed class Enemy
         e.AttackCd = 30f;
         return e;
     }
+
+    /// <summary>Elite: 2.2x health, a third bigger, a little faster, and a guard even if the base kind has none.</summary>
+    public void MakeElite()
+    {
+        if (Elite || Boss) return;
+        Elite = true;
+        Hp = MaxHp = (int)(MaxHp * 2.2f);
+        Radius *= 1.3f;
+        Speed *= 1.1f;
+        MaxPoise = Poise = MathF.Max(MaxPoise * 1.5f, 40f);
+    }
 }
+
+public enum RoomKind { Fight, Elite, Boss }
+
+/// <summary>One room of a run: what it spawns. In an elite room the first enemy is the elite.</summary>
+public sealed record Room(RoomKind Kind, EKind[] Enemies);
 
 public sealed class Proj
 {
@@ -95,9 +127,12 @@ public enum Ev
 {
     Swing, Hit, Kill, Dash, Perfect, PlayerHurt, Shoot, Deflect, ShatterCast, Shatter,
     Telegraph, Slam, ChargeFull, WaveStart, WaveClear, Victory, Defeat, Charge, WallHit, Bowl,
+    /// <summary>Altars rose after a room (I = how many). Then Reward: one was taken (I = its index), Burn: a burn tick.</summary>
+    Altars, Reward, Burn, Heal,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>
 public readonly record struct GameEvent(Ev Kind, Vector2 Pos, float A = 0f, int I = 0);
 
-public enum Phase { Intermission, Fighting, Won, Lost }
+/// <summary>Intermission: the pause before a room. Reward: the room is clear and the altars wait for a pick.</summary>
+public enum Phase { Intermission, Fighting, Reward, Won, Lost }

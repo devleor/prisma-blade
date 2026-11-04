@@ -167,7 +167,7 @@ public partial class Main : Node2D
                     Fx.Ring(pos, 30, Moves.Spin.Reach, 0.25f, new Color(1, 0.95f, 0.85f, 0.8f), 6f);
                     Shake(0.15f);
                 }
-                else if (ev.I == 3) { Sfx.Play("heavy_swing", 2f, 0.6f); Shake(0.12f); }
+                else if (ev.I == Moves.HeavyIndex) { Sfx.Play("heavy_swing", 2f, 0.6f); Shake(0.12f); }
                 else Sfx.Play("swing", -2f, ev.I == 2 ? 0.8f : 1.05f);
                 break;
             case Ev.Hit:
@@ -261,8 +261,8 @@ public partial class Main : Node2D
                 break;
             case Ev.WaveStart:
                 Sfx.Play("wave_start", -2f, 1f, 0f);
-                if (ev.I >= World.Waves.Length - 1) { Sfx.Music("boss"); Hud.Show("MONÓLITO", "quebre a guarda dele (barra amarela) para abrir a defesa", 3f); }
-                else Hud.Show($"ONDA {ev.I + 1}", ev.I == 0 ? "dash no último instante de um ataque = PERFEITO" : "");
+                if (World.BossRoom) { Sfx.Music("boss"); Hud.Show("MONÓLITO", "quebre a guarda dele (barra amarela) para abrir a defesa", 3f); }
+                else Hud.Show($"SALA {ev.I + 1}", ev.I == 0 ? "dash no último instante de um ataque = PERFEITO" : "");
                 break;
             case Ev.WaveClear:
                 Hud.Show("ONDA LIMPA", "+25 de vida", 1.6f);
@@ -519,8 +519,8 @@ public partial class Main : Node2D
 
         if (p.State == PState.Charge)
         {
-            float k = p.Charge / (float)Tune.ChargeMax;
-            bool full = p.Charge >= Tune.ChargeMax;
+            float k = p.Charge / (float)p.Weapon.ChargeFrames;
+            bool full = p.Weapon.FullCharge(p.Charge);
             var c = full ? new Color(1.4f, 1.05f, 0.5f) : HeavyCol;
             c.A = full ? 0.6f + 0.4f * Mathf.Sin(World.Frame * 0.6f) : 0.35f + 0.4f * k;
             DrawArc(pos, Mathf.Lerp(70, 26, k), 0, Mathf.Tau, 40, c, full ? 5 : 3);
@@ -533,7 +533,7 @@ public partial class Main : Node2D
             var side = dir.Orthogonal();
             float len = (p.State == PState.Attack ? p.BladeReach : 92f) - 6f;
             var hilt = pos + dir * 14;
-            var steel = p.State == PState.Charge && p.Charge >= Tune.ChargeMax ? new Color(1.3f, 1.0f, 0.55f)
+            var steel = p.State == PState.Charge && p.Weapon.FullCharge(p.Charge) ? new Color(1.3f, 1.0f, 0.55f)
                 : p.BladeActive && p.HeavySwing ? new Color(1f, 0.85f, 0.55f) : new Color(0.82f, 0.84f, 0.86f);
             if (blink) steel.A = 0.45f;
             Vector2[] blade = [hilt + side * 5, pos + dir * len + side * 1.5f, pos + dir * (len + 12), pos + dir * len - side * 1.5f, hilt - side * 5];

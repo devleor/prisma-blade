@@ -280,20 +280,27 @@ public class CombatTests
     }
 
     [Fact]
-    public void Clearing_a_wave_heals_and_brings_the_next()
+    public void Clearing_a_room_heals_raises_altars_and_taking_one_brings_the_next()
     {
         var w = new World(seed: 3, waves: true);
         Run(w, 80);
         Assert.Equal(0, w.Wave);
-        Assert.Equal(World.Waves[0].Length, w.Enemies.Count);
+        Assert.Equal(w.Rooms[0].Enemies.Length, w.Enemies.Count);
         w.Player.Hp = 50;
         foreach (var e in w.Enemies) e.Hp = 0;
-        Run(w, 2);
-        Assert.Equal(Phase.Intermission, w.Phase);
+        var ev = Run(w, 2);
+        Assert.Equal(Phase.Reward, w.Phase);
         Assert.Equal(75, w.Player.Hp);
-        Run(w, 130);
+        Assert.Contains(ev, x => x.Kind == Ev.Altars && x.I == 3);
+        Run(w, 300);
+        Assert.Equal(Phase.Reward, w.Phase); // the run waits for a pick
+        Assert.Equal(0, w.Wave);
+        w.TakeAltar(1);
+        Assert.Empty(w.Altars);
+        Assert.Equal(Phase.Intermission, w.Phase);
+        Run(w, 100);
         Assert.Equal(1, w.Wave);
-        Assert.Equal(World.Waves[1].Length, w.Enemies.Count);
+        Assert.Equal(w.Rooms[1].Enemies.Length, w.Enemies.Count);
     }
 
     [Fact]
@@ -334,7 +341,7 @@ public class CombatTests
     public void A_leftover_shot_cannot_turn_a_victory_into_a_defeat()
     {
         var w = new World(seed: 4, waves: true);
-        w.Wave = World.Waves.Length - 1;
+        w.Wave = w.Rooms.Count - 1;
         w.Phase = Phase.Fighting;
         w.Player.Hp = 5;
         w.Projs.Add(new Proj { Pos = w.Player.Pos + new Vector2(200f, 0f), Vel = new Vector2(-300f, 0f), Life = 4f, Damage = 10 });

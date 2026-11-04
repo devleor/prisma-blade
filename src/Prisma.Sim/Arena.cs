@@ -71,7 +71,7 @@ public sealed partial class World
         else
         {
             float left = e.State == EState.Stun ? e.StunLen - e.T : 0f;
-            Damage(e, 6 + (int)(into / 90f), n, 0f, 15f, 40f);
+            Damage(e, (int)((6 + (int)(into / 90f)) * Player.Weapon.WallDamage), n, 0f, 15f, 40f);
             if (e.State == EState.Stun && left > e.StunLen) { e.T = 0f; e.StunLen = left; } // never cuts a longer daze short
             Hitstop = Math.Max(Hitstop, 3);
             Emit(Ev.WallHit, e.Pos - n * e.Radius, into, 0);
