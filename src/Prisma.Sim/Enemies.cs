@@ -72,13 +72,153 @@ public sealed partial class World
                     case EKind.Imp: ImpAi(e, dir, dist, dt); break;
                     case EKind.Bomber: BomberAi(e, dir, dist, dt); break;
                     case EKind.Shield: ShieldAi(e, dir, dist, dt); break;
+                    case EKind.Ogre: OgreAi(e, dir, dist, dt); break;
+                    case EKind.Brood: BroodAi(e, dir, dist, dt); break;
+                    case EKind.Spiderling: SpiderlingAi(e, dir, dist, dt); break;
                 }
                 break;
         }
 
         if (e.WallCd > 0f) e.WallCd -= ts;
         if (e.BowlCd > 0f) e.BowlCd -= ts;
+        var before = e.Pos;
         MoveEnemy(e, dt);
+        if (e.Kind is EKind.Ogre or EKind.Brood or EKind.Monolith || e.Elite && e.Radius >= 30f)
+        {
+            e.Stride += Vector2.Distance(before, e.Pos);
+            if (e.Stride >= e.Radius * 2.2f) { e.Stride = 0f; Emit(Ev.Stomp, e.Pos, e.Radius, (int)e.Kind); }
+        }
+    }
+
+    // ---------------------------------------------------------------- the big ones
+
+    public const float OgreReach = 90f, OgreSlamRadius = 105f;
+    public const int OgreWindup = 56, OgreSlamDamage = 22, OgreChargeDamage = 16;
+
+    /// <summary>
+    /// Ogre: lumbers in and brings its club down where it points (a circle 90 px ahead, after a long windup it can
+    /// still be dodged out of); from far away it sometimes lowers its head and charges.
+    /// </summary>
+    void OgreAi(Enemy e, Vector2 dir, float dist, float dt)
+    {
+        switch (e.State)
+        {
+            case EState.Idle:
+                Seek(e, dir * e.Speed, dt);
+                if (e.AttackCd <= 0f)
+                {
+                    if (dist < 170f) Telegraph(e, 0);
+                    else if (dist > 320f && Rng.F() < 0.02f) Telegraph(e, 1);
+                }
+                break;
+            case EState.Telegraph:
+                Slow(e, 10f, dt);
+                if (e.Mode == 0)
+                {
+                    if (e.T < 22f) e.Aim = dir; // it tracks you, then commits: about half a second to walk out
+                    if (e.T >= OgreWindup)
+                    {
+                        var at = e.Pos + e.Aim * OgreReach;
+                        if (Vector2.Distance(Player.Pos, at) < OgreSlamRadius + Tune.PlayerRadius) HurtPlayer(OgreSlamDamage, at, e);
+                        Emit(Ev.Slam, at, OgreSlamRadius, (int)EKind.Ogre);
+                        Go(e, EState.Recover);
+                    }
+                }
+                else
+                {
+                    if (e.T < 22f) e.Aim = dir;
+                    if (e.T >= 34f) { Go(e, EState.Act); e.HitPlayerThisAct = false; }
+                }
+                break;
+            case EState.Act: // the charge
+                e.Vel = e.Aim * 600f;
+                Contact(e, OgreChargeDamage);
+                if (e.T >= 48f) Go(e, EState.Recover);
+                break;
+            case EState.Recover:
+                Slow(e, 6f, dt);
+                if (e.T >= 60f) { Go(e, EState.Idle); e.AttackCd = 45f; }
+                break;
+        }
+    }
+
+    public const int BroodMax = 5, BroodClutch = 2;
+
+    /// <summary>
+    /// Brood (spider mother): keeps her distance and lays egg sacs that hatch spiderlings (never more than five at
+    /// once); come too close and she bites.
+    /// </summary>
+    void BroodAi(Enemy e, Vector2 dir, float dist, float dt)
+    {
+        switch (e.State)
+        {
+            case EState.Idle:
+                var side = new Vector2(-dir.Y, dir.X) * e.StrafeSign;
+                Seek(e, (dist < 240f ? -dir : dist > 380f ? dir : side) * e.Speed, dt);
+                if (e.AttackCd > 0f) break;
+                if (dist < 110f) Telegraph(e, 1);
+                else if (Enemies.Count(x => x.Kind == EKind.Spiderling && x.Alive) < BroodMax) Telegraph(e, 0);
+                break;
+            case EState.Telegraph:
+                Slow(e, 9f, dt);
+                if (e.Mode == 0)
+                {
+                    if (e.T >= 40f)
+                    {
+                        int room = BroodMax - Enemies.Count(x => x.Kind == EKind.Spiderling && x.Alive);
+                        int n = Math.Min(BroodClutch, room);
+                        var back = e.Pos - dir * (e.Radius + 6f);
+                        for (int i = 0; i < n; i++)
+                        {
+                            var s = Spawn(EKind.Spiderling, back + new Vector2(-dir.Y, dir.X) * (i == 0 ? -14f : 14f));
+                            s.T = 26f; // hatches quickly
+                        }
+                        Emit(Ev.Hatch, back, 0f, n);
+                        Go(e, EState.Recover);
+                    }
+                }
+                else
+                {
+                    if (e.T < 8f) e.Aim = dir;
+                    if (e.T >= 14f) { Go(e, EState.Act); e.HitPlayerThisAct = false; }
+                }
+                break;
+            case EState.Act: // the bite
+                e.Vel = e.Aim * 420f * MathF.Max(0f, 1f - e.T / 20f);
+                Contact(e, 12);
+                if (e.T >= 14f) Go(e, EState.Recover);
+                break;
+            case EState.Recover:
+                Slow(e, 7f, dt);
+                if (e.T >= 30f) { Go(e, EState.Idle); e.AttackCd = e.Mode == 0 ? 150f : 60f; }
+                break;
+        }
+    }
+
+    /// <summary>Spiderling: a fast little biter that weaves in and nips.</summary>
+    void SpiderlingAi(Enemy e, Vector2 dir, float dist, float dt)
+    {
+        switch (e.State)
+        {
+            case EState.Idle:
+                var side = new Vector2(-dir.Y, dir.X) * e.StrafeSign;
+                Seek(e, (dir + side * 0.6f * MathF.Sin(e.T * 0.2f + e.Id)) * e.Speed, dt);
+                if (dist < 60f && e.AttackCd <= 0f) { Telegraph(e); e.Aim = dir; }
+                break;
+            case EState.Telegraph:
+                Slow(e, 12f, dt);
+                if (e.T >= 8f) { Go(e, EState.Act); e.HitPlayerThisAct = false; }
+                break;
+            case EState.Act:
+                e.Vel = e.Aim * 380f * MathF.Max(0f, 1f - e.T / 14f);
+                Contact(e, 4);
+                if (e.T >= 12f) Go(e, EState.Recover);
+                break;
+            case EState.Recover:
+                Slow(e, 8f, dt);
+                if (e.T >= 16f) { Go(e, EState.Idle); e.AttackCd = 45f; }
+                break;
+        }
     }
 
     static void Go(Enemy e, EState s) { e.State = s; e.T = 0f; }

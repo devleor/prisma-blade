@@ -54,11 +54,11 @@ public sealed class Dungeon(int floor)
     static readonly (EKind Kind, int From, float Cost)[] Pool =
     [
         (EKind.Spike, 0, 1f), (EKind.Imp, 0, 0.5f), (EKind.Orb, 1, 1f), (EKind.Bomber, 2, 1.5f),
-        (EKind.Bastion, 3, 2.5f), (EKind.Shield, 4, 2f),
+        (EKind.Bastion, 3, 2.5f), (EKind.Shield, 4, 2f), (EKind.Ogre, 7, 3.5f), (EKind.Brood, 8, 3f),
     ];
 
     /// <summary>The kinds that can stand as a room's guardian.</summary>
-    static readonly EKind[] Leaders = [EKind.Spike, EKind.Orb, EKind.Bomber, EKind.Bastion, EKind.Shield];
+    static readonly EKind[] Leaders = [EKind.Spike, EKind.Orb, EKind.Bomber, EKind.Bastion, EKind.Shield, EKind.Ogre, EKind.Brood];
 
     /// <summary>Pillar layouts a room can have. Kept clear of the doorways and of the altar spots.</summary>
     public static readonly Pillar[][] Layouts =

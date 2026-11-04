@@ -54,7 +54,8 @@ public sealed class Player
     public bool Invulnerable => Invuln > 0 || (State == PState.Dash && T <= Tune.DashIFrames);
 }
 
-public enum EKind { Spike, Orb, Bastion, Monolith, Imp, Bomber, Shield }
+/// <summary>Ogre and Brood are the big ones (guardians from mid floors on); Spiderling hatches from the Brood's egg sacs.</summary>
+public enum EKind { Spike, Orb, Bastion, Monolith, Imp, Bomber, Shield, Ogre, Brood, Spiderling }
 
 public enum EState { Spawn, Idle, Telegraph, Act, Recover, Stun, Dead }
 
@@ -72,6 +73,8 @@ public sealed class Enemy
     public bool HitPlayerThisAct;
     public int Mode, Sub, Pattern;
     public float StrafeSign = 1f;
+    /// <summary>Distance walked since the last footfall (the big ones shake the floor every stride).</summary>
+    public float Stride;
     /// <summary>Frames of burning left (Brasa relic) and the frame counter toward the next tick.</summary>
     public int Burn, BurnT;
     /// <summary>Elite: a bigger, tougher version that leads a room.</summary>
@@ -95,6 +98,9 @@ public sealed class Enemy
             EKind.Imp => (16, 11f, 210f, 0f),
             EKind.Bomber => (45, 18f, 95f, 0f),
             EKind.Shield => (70, 20f, 105f, 25f),
+            EKind.Ogre => (260, 38f, 72f, 70f),
+            EKind.Brood => (170, 34f, 82f, 30f),
+            EKind.Spiderling => (10, 9f, 230f, 0f),
             _ => (700, 46f, 70f, 90f),
         };
         e.MaxHp = e.Hp;
@@ -150,6 +156,8 @@ public enum Ev
     Block, Lob, Explode,
     /// <summary>RoomEnter (A = RoomKind, I = floor), Guardian rose (A = how many, I = kind), GatesOpen, Portal, NextFloor (I = floor).</summary>
     RoomEnter, Guardian, GatesOpen, Portal, NextFloor,
+    /// <summary>Stomp: a big one's footfall (A = its radius). Hatch: the Brood laid an egg sac (I = how many spiderlings).</summary>
+    Stomp, Hatch,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>

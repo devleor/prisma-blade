@@ -60,6 +60,10 @@ O rastro do golpe é uma aquarela clara na cor da espada, com a borda de fora pa
 - Diabrete: bolinha vermelha, chifres, asas de morcego que batem, rabo em ziguezague.
 - Bombardeiro: goblin de orelhas pontudas com bolsa de bombas; ergue uma bomba acesa antes de jogar.
 - Escudeiro: elmo com viseira, tabardo e escudo curvo na frente; o escudo abaixa quando ele está aberto.
+- Ogro (grande): costas largas e peludas, cabecinha com presas à frente, punho de um lado e clava cravejada do
+  outro, que sobe durante a preparação e desce no golpe; o chão treme e fica pegada a cada passo.
+- Aranha-mãe (grande) e aranhinhas: oito patas articuladas que andam aos pares, abdômen com ampulheta vermelha,
+  cacho de olhos; a mãe carrega ovos nas costas e incha uma bolsa de ovos antes de chocar.
 - Ídolo Monólito: losango de pedra entalhado, rachaduras que viram brasa na fase 2, olho que se abre e queima.
 
 O elite ganha coroa dourada e uma aura rabiscada. O atordoado ganha estrelinhas desenhadas, o que está

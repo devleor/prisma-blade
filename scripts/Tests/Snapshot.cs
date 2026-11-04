@@ -69,10 +69,10 @@ public partial class Snapshot : Node
             w.Phase = Phase.Fighting;
             p.Pos = new V(0f, 200f);
             p.Invuln = 100000;
-            EKind[] kinds = [EKind.Spike, EKind.Orb, EKind.Bastion, EKind.Imp, EKind.Bomber, EKind.Shield];
+            EKind[] kinds = [EKind.Spike, EKind.Orb, EKind.Bastion, EKind.Imp, EKind.Bomber, EKind.Shield, EKind.Ogre, EKind.Brood, EKind.Spiderling];
             for (int i = 0; i < kinds.Length; i++)
             {
-                var e = w.Spawn(kinds[i], new V(-450f + i * 180f, -40f));
+                var e = w.Spawn(kinds[i], new V(-500f + i * 125f, i % 2 == 0 ? -60f : 40f));
                 e.State = EState.Idle; e.AttackCd = 1e6f; e.T = -1e6f; e.Speed = 0f;
                 if (i == 5) e.MakeElite();
                 if (i == 2) e.Fracture = 2;

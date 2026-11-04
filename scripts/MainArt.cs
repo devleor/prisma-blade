@@ -28,6 +28,9 @@ public partial class Main
         EKind.Imp => new Color(0.84f, 0.26f, 0.2f),
         EKind.Bomber => new Color(0.5f, 0.62f, 0.36f),
         EKind.Shield => new Color(0.62f, 0.64f, 0.68f),
+        EKind.Ogre => new Color(0.66f, 0.55f, 0.42f),
+        EKind.Brood => new Color(0.36f, 0.3f, 0.4f),
+        EKind.Spiderling => new Color(0.42f, 0.36f, 0.44f),
         _ => new Color(0.6f, 0.52f, 0.5f),
     };
 
@@ -39,6 +42,9 @@ public partial class Main
         EKind.Imp => "Diabrete",
         EKind.Bomber => "Bombardeiro",
         EKind.Shield => "Escudeiro",
+        EKind.Ogre => "Ogro",
+        EKind.Brood => "Aranha-mãe",
+        EKind.Spiderling => "Aranhinha",
         _ => "Monólito",
     };
 
@@ -567,6 +573,39 @@ public partial class Main
                 Ink.Stroke(this, ring, true, 2.5f, seed, new Color(DangerCol, 0.45f + 0.4f * pulse));
                 break;
             }
+            case EKind.Ogre when e.Mode == 0:
+            {
+                // where the club will land: a ring that fills with hatching; it stops following you when the aim locks
+                var at = pos + G(e.Aim) * World.OgreReach;
+                float k = Mathf.Clamp(e.T / World.OgreWindup, 0, 1);
+                bool locked = e.T >= 22f;
+                Ink.Hatch(this, Ink.Circle(at, World.OgreSlamRadius * k, seed + 1, 0.03f), 9f, 0.8f, new Color(DangerCol, 0.35f), 1.5f, seed + 2);
+                Ink.Stroke(this, Ink.Circle(at, World.OgreSlamRadius, seed, 0.03f), true, locked ? 3.2f : 2f, seed, new Color(DangerCol, (locked ? 0.6f : 0.35f) + 0.3f * pulse));
+                break;
+            }
+            case EKind.Ogre:
+            {
+                var aim = G(e.Aim);
+                DrawLine(pos, pos + aim * 460f, new Color(DangerCol, 0.15f + 0.25f * pulse), e.Radius * 1.5f);
+                Ink.Stroke(this, [pos + aim * 440f + aim.Orthogonal() * 22f, pos + aim * 470f, pos + aim * 440f - aim.Orthogonal() * 22f], false, 3f, seed, new Color(DangerCol, 0.8f));
+                break;
+            }
+            case EKind.Brood when e.Mode == 0:
+            {
+                // the egg sac swelling at her back
+                var back = pos - (G(World.Player.Pos) - pos).Normalized() * (e.Radius + 6f);
+                float k = Mathf.Clamp(e.T / 40f, 0, 1);
+                Ink.Shape(this, Ink.Blob(back, 6f + 12f * k, 5f + 10f * k, 0.4f, seed + 7, 0.12f, 12), new Color(0.88f, 0.86f, 0.74f), seed + 7, 2f, 3f);
+                break;
+            }
+            case EKind.Brood:
+            case EKind.Spiderling:
+            {
+                var aim = G(e.Aim);
+                float reach = e.Kind == EKind.Brood ? 90f : 50f;
+                Ink.Stroke(this, [pos + aim * (e.Radius + 6), pos + aim * reach], false, 2.5f, seed, new Color(DangerCol, 0.6f + 0.3f * pulse));
+                break;
+            }
             case EKind.Monolith:
                 if (e.Mode == 0) DrawLine(pos, pos + G(e.Aim) * 900, new Color(DangerCol, 0.2f + 0.25f * pulse), e.Radius * 1.4f);
                 else if (e.Mode == 1) Ink.Stroke(this, Ink.Circle(pos, e.Radius + 10 + e.T * 2.5f, seed), true, 3f, seed, new Color(DangerCol, 0.6f));
@@ -618,6 +657,9 @@ public partial class Main
             case EKind.Imp: DrawImp(pos, r, f, s, fill, alpha, w, seed, e); break;
             case EKind.Bomber: DrawGoblin(pos, r, f, s, fill, alpha, w, seed, e); break;
             case EKind.Shield: DrawKnight(pos, r, f, s, fill, alpha, w, seed, e); break;
+            case EKind.Ogre: DrawOgre(pos, r, f, s, fill, alpha, w, seed, e); break;
+            case EKind.Brood: DrawSpider(pos, r, f, s, fill, alpha, w, seed, e, true); break;
+            case EKind.Spiderling: DrawSpider(pos, r, f, s, fill, alpha, w * 0.7f, seed, e, false); break;
             default: DrawIdol(pos, r, fill, alpha, w, seed, e); break;
         }
 
@@ -704,6 +746,91 @@ public partial class Main
         Ink.Shape(this, Ink.Circle(iris, r * 0.3f, seed + 2), new Color(0.75f, 0.2f, 0.15f), seed + 2, 1.4f, 0f, null, alpha);
         DrawCircle(iris, r * 0.13f, new Color(0.05f, 0.03f, 0.03f, alpha));
         DrawCircle(iris + new Vector2(-2, -2), 1.5f, new Color(1, 1, 1, alpha));
+    }
+
+    /// <summary>
+    /// Ogre, from above: a hunched hairy back with a small head pushed forward, huge shoulders, a fist on one side and
+    /// a spiked club on the other. The club rises during the windup and comes down on the slam.
+    /// </summary>
+    void DrawOgre(Vector2 pos, float r, Vector2 f, Vector2 s, Color fill, float alpha, float w, int seed, Enemy e)
+    {
+        float walk = Mathf.Sin(e.Stride / (e.Radius * 2.2f) * Mathf.Pi);
+        foreach (int side in new[] { -1, 1 }) // feet peeking out behind
+        {
+            var foot = pos - f * r * (0.55f + 0.2f * walk * side) + s * side * r * 0.45f;
+            Ink.Shape(this, Ink.Blob(foot, r * 0.28f, r * 0.2f, f.Angle(), seed + 20 + side, 0.15f, 9), fill.Darkened(0.3f), seed + 20 + side, w * 0.7f, 0f, null, alpha);
+        }
+        // the club arm (right): raised during the windup, down after the slam
+        float raise = e.State == EState.Telegraph && e.Mode == 0 ? Mathf.Clamp(e.T / World.OgreWindup, 0, 1) : 0f;
+        var shoulderR = pos + s * r * 0.85f + f * r * 0.1f;
+        var clubDir = (f * (1f - raise) - f * raise * 0.6f + s * 0.35f).Normalized();
+        var hand = shoulderR + clubDir * r * 0.6f;
+        var head = hand + clubDir * r * (1.3f + 0.3f * (1 - raise));
+        Ink.Line2(this, hand, head, 7f + r * 0.05f, seed + 30, new Color(0.42f, 0.28f, 0.16f, alpha));
+        var knob = Ink.Blob(head, r * 0.42f, r * 0.34f, clubDir.Angle(), seed + 31, 0.2f, 10);
+        Ink.Shape(this, knob, new Color(0.5f, 0.35f, 0.2f), seed + 31, w * 0.9f, r * 0.1f, null, alpha);
+        for (int k = 0; k < 5; k++) // iron studs
+        {
+            var d = Vector2.FromAngle(clubDir.Angle() + (k - 2) * 0.7f);
+            DrawLine(head + d * r * 0.3f, head + d * r * 0.5f, new Color(0.3f, 0.3f, 0.32f, alpha), 3f);
+        }
+        // the free fist (left)
+        var fist = pos - s * r * 0.95f + f * r * 0.45f;
+        Ink.Shape(this, Ink.Blob(fist, r * 0.32f, r * 0.28f, f.Angle(), seed + 5, 0.15f, 9), SkinTone(fill), seed + 5, w * 0.8f, 0f, null, alpha);
+        // body: broad hunched back with a loincloth band and shaggy hair along the spine
+        var body = Ink.Blob(pos, r * 1.05f, r * 0.9f, s.Angle(), seed, 0.12f, 14);
+        Ink.Shape(this, body, SkinTone(fill), seed, w, r * 0.35f, null, alpha);
+        Ink.Fill(this, Ink.Blob(pos - f * r * 0.45f, r * 0.8f, r * 0.28f, s.Angle(), seed + 2, 0.15f, 12), new Color(0.45f, 0.3f, 0.18f, 0.85f * alpha), seed + 2);
+        for (int k = -3; k <= 3; k++) // hair tufts down the back
+        {
+            var root = pos + s * k * r * 0.12f - f * r * 0.05f;
+            Ink.Stroke(this, [root, root - f * r * 0.22f + s * Ink.Hash(seed, k) * 4f], false, 1.6f, seed + 40 + k, new Color(Ink.Line, 0.8f * alpha));
+        }
+        // the small head with tusks
+        var hp = pos + f * r * 0.72f;
+        Ink.Shape(this, Ink.Circle(hp, r * 0.34f, seed + 8, 0.08f), SkinTone(fill).Darkened(0.08f), seed + 8, w * 0.8f, r * 0.08f, null, alpha);
+        foreach (int side in new[] { -1, 1 })
+        {
+            var t0 = hp + f * r * 0.2f + s * side * r * 0.14f;
+            Ink.Shape(this, [t0 - s * side * 2f, t0 + f * r * 0.22f - s * side * 3f, t0 + s * side * 2.5f], new Color(0.95f, 0.9f, 0.78f), seed + 9 + side, 1.2f, 0f, null, alpha);
+            DrawCircle(hp + f * r * 0.12f + s * side * r * 0.12f, 2.2f, new Color(1.3f, 0.5f, 0.2f, alpha));
+        }
+    }
+
+    static Color SkinTone(Color fill) => fill;
+
+    /// <summary>
+    /// Spider (the Brood and her spiderlings): eight jointed legs that step in pairs, a round abdomen with a pale
+    /// hourglass, a smaller head with a cluster of eyes. The mother carries a few eggs on her back.
+    /// </summary>
+    void DrawSpider(Vector2 pos, float r, Vector2 f, Vector2 s, Color fill, float alpha, float w, int seed, Enemy e, bool mother)
+    {
+        float gait = e.Stride / Mathf.Max(1f, e.Radius) + e.T * (mother ? 0.05f : 0.35f);
+        for (int side = -1; side <= 1; side += 2)
+            for (int k = 0; k < 4; k++)
+            {
+                float phase = Mathf.Sin(gait * 2f + k * 1.6f + (side > 0 ? Mathf.Pi : 0f));
+                float along = 0.55f - k * 0.4f;
+                var root = pos + f * r * along * 0.6f + s * side * r * 0.35f;
+                var knee = root + s * side * r * 0.9f + f * r * (along + 0.25f * phase);
+                var foot = knee + s * side * r * 0.35f + f * r * (along * 0.8f - 0.25f + 0.2f * phase);
+                Ink.Stroke(this, [root, knee, foot], false, mother ? 2.6f : 1.4f, seed + 50 + k + side * 10, new Color(Ink.Line, alpha));
+            }
+        var abdomen = pos - f * r * 0.35f;
+        Ink.Shape(this, Ink.Blob(abdomen, r * 0.85f, r * 0.75f, f.Angle(), seed, 0.08f, 14), fill, seed, w, r * 0.25f, null, alpha);
+        Ink.Shape(this, [abdomen - f * r * 0.35f, abdomen - s * r * 0.15f, abdomen + f * r * 0.3f, abdomen + s * r * 0.15f], new Color(0.86f, 0.3f, 0.2f), seed + 3, 1.2f, 0f, null, alpha); // the hourglass
+        if (mother)
+            for (int k = 0; k < 5; k++)
+            {
+                var egg = abdomen + Vector2.FromAngle(k * 1.3f + seed) * r * 0.45f;
+                Ink.Shape(this, Ink.Circle(egg, r * 0.13f, seed + 60 + k, 0.1f), new Color(0.9f, 0.88f, 0.76f), seed + 60 + k, 1.2f, 0f, null, alpha);
+            }
+        var head = pos + f * r * 0.5f;
+        Ink.Shape(this, Ink.Circle(head, r * 0.42f, seed + 4, 0.08f), fill.Darkened(0.15f), seed + 4, w * 0.9f, 0f, null, alpha);
+        for (int k = 0; k < (mother ? 6 : 4); k++)
+            DrawCircle(head + f * r * 0.18f + s * (k - (mother ? 2.5f : 1.5f)) * r * 0.1f + f * (k % 2) * r * 0.08f, mother ? 2f : 1.2f, new Color(1.3f, 0.25f, 0.2f, alpha));
+        foreach (int side in new[] { -1, 1 }) // fangs
+            Ink.Stroke(this, [head + f * r * 0.35f + s * side * r * 0.12f, head + f * r * 0.58f + s * side * r * 0.04f], false, 1.5f, seed + 70 + side, new Color(Ink.Line, alpha));
     }
 
     void DrawGolem(Vector2 pos, float r, Vector2 f, Vector2 s, Color fill, float alpha, float w, int seed)

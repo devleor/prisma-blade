@@ -282,10 +282,26 @@ public partial class Main : Node2D
             case Ev.Telegraph:
                 if ((EKind)ev.I == EKind.Monolith) Sfx.Play("charge", -6f, 0.55f, 0f);
                 break;
+            case Ev.Stomp:
+            {
+                // a big one's footfall: the floor jolts (more when it is near you) and a dusty print stays
+                float near = 1f - Mathf.Clamp((pos - G(p.Pos)).Length() / 700f, 0f, 1f);
+                Shake(0.03f + 0.07f * near * ev.A / 40f);
+                Fx.Puff(pos, new Color(0.6f, 0.52f, 0.42f), 0.4f + ev.A / 80f, 3);
+                Stains.Drops(pos, new Color(0.35f, 0.3f, 0.26f), rng.RandfRange(0, Mathf.Tau), 2);
+                Sfx.Play("heavy_hit", -16f, 0.35f);
+                break;
+            }
+            case Ev.Hatch:
+                Sfx.Play("enemy_die", -6f, 1.6f);
+                Fx.Shards(pos, new Color(0.88f, 0.86f, 0.74f), 8, 160, 4f);
+                Stains.Splat(pos, 14f, new Color(0.62f, 0.66f, 0.42f), rng.RandfRange(0, Mathf.Tau), 4);
+                break;
             case Ev.Slam:
                 Sfx.Play("heavy_hit", 0f, 0.55f);
                 Fx.Ring(pos, 20, ev.A, 0.3f, new Color(Ink.Line, 0.7f), 7f);
-                Fx.Shards(pos, KindColor(EKind.Bastion), 10, 300, 6f);
+                Fx.Shards(pos, KindColor(ev.I == (int)EKind.Ogre ? EKind.Ogre : EKind.Bastion), 10, 300, 6f);
+                if (ev.I == (int)EKind.Ogre) { Shake(0.25f); Kick((pos - G(p.Pos)).Angle() + Mathf.Pi, 14f); }
                 Stains.Scorch(pos, ev.A * 0.7f);
                 Shake(0.3f);
                 break;
