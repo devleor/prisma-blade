@@ -190,10 +190,11 @@ public class EnemyTests
     {
         var seen = new HashSet<EKind>();
         for (uint seed = 1; seed <= 30; seed++)
-            foreach (var r in World.MakeRun(seed)) seen.UnionWith(r.Enemies);
+            for (int f = 0; f < Dungeon.Floors; f++)
+                foreach (var r in Dungeon.Make(seed, f).Rooms.Values) { seen.UnionWith(r.Waves.SelectMany(x => x)); seen.UnionWith(r.Guardians); }
         Assert.Contains(EKind.Imp, seen);
         Assert.Contains(EKind.Bomber, seen);
         Assert.Contains(EKind.Shield, seen);
-        Assert.All(World.MakeRun(7).Take(3), r => Assert.DoesNotContain(EKind.Shield, r.Enemies));
+        Assert.All(Dungeon.Make(7, 0).Rooms.Values.Where(r => r.Depth <= 1), r => Assert.DoesNotContain(EKind.Shield, r.Waves.SelectMany(x => x)));
     }
 }

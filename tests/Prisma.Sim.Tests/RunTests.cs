@@ -35,11 +35,11 @@ public class RunTests
         return all;
     }
 
-    /// <summary>A world sitting at the reward step with one altar holding the given offer.</summary>
+    /// <summary>A world in a cleared room (gates open) with one altar holding the given offer.</summary>
     static World WithAltar(Offer offer)
     {
         var w = Arena();
-        w.Phase = Phase.Reward;
+        w.Phase = Phase.Explore;
         w.Altars.Add(new Altar { Pos = w.Player.Pos + Up * 70f, Offer = offer });
         return w;
     }
@@ -53,40 +53,66 @@ public class RunTests
     }
 
     /// <summary>A room's weight: what it would have cost from the generator's budget.</summary>
-    static float Weight(Room r) => r.Enemies.Sum(k => k switch
+    static float Weight(EKind[] wave) => wave.Sum(k => k switch
     {
         EKind.Bastion => 2.5f, EKind.Shield => 2f, EKind.Bomber => 1.5f, EKind.Imp => 0.5f, EKind.Monolith => 10f, _ => 1f,
     });
 
-    // ---------------------------------------------------------------- the run
+    // ---------------------------------------------------------------- the dungeon
 
-    [Fact]
-    public void A_run_is_the_same_for_a_seed_has_elite_rooms_and_ends_with_the_boss()
+    static World InFight(uint seed, RoomKind kind = RoomKind.Fight)
     {
-        var a = World.MakeRun(11);
-        var b = World.MakeRun(11);
-        Assert.Equal(World.RunLength, a.Count);
-        for (int i = 0; i < a.Count; i++)
-        {
-            Assert.Equal(a[i].Kind, b[i].Kind);
-            Assert.Equal(a[i].Enemies, b[i].Enemies);
-        }
-        Assert.Equal(RoomKind.Boss, a[^1].Kind);
-        Assert.Equal([EKind.Monolith], a[^1].Enemies);
-        foreach (int i in World.EliteRooms) Assert.Equal(RoomKind.Elite, a[i].Kind);
-        Assert.Contains(Enumerable.Range(1, 30), s => !World.MakeRun((uint)s)[4].Enemies.SequenceEqual(a[4].Enemies));
+        var w = new World(seed, waves: true);
+        var room = w.Map.Rooms.Values.First(r => r.Kind == kind);
+        w.EnterRoom(room, Side.S);
+        return w;
+    }
+
+    /// <summary>Puts the room at its guardians with every enemy gone, so the next step clears it.</summary>
+    static void GuardiansDown(World w)
+    {
+        w.Wave = w.Room.Waves.Length;
+        w.GuardianUp = true;
+        w.Phase = Phase.Fighting;
+        w.Enemies.Clear();
     }
 
     [Fact]
-    public void Rooms_get_heavier_deeper_and_the_first_rooms_hold_only_light_enemies()
+    public void A_floor_is_the_same_for_a_seed_and_a_connected_tree_with_the_boss_at_its_deepest_dead_end()
     {
-        for (uint seed = 1; seed <= 30; seed++)
+        for (uint seed = 1; seed <= 25; seed++)
+            for (int floor = 0; floor < Dungeon.Floors; floor++)
+            {
+                var a = Dungeon.Make(seed, floor);
+                var b = Dungeon.Make(seed, floor);
+                Assert.Equal(Dungeon.RoomCount(floor), a.Rooms.Count);
+                Assert.Equal(a.Rooms.Keys.OrderBy(k => k), b.Rooms.Keys.OrderBy(k => k));
+                Assert.Equal(RoomKind.Start, a.Start.Kind);
+                Assert.Equal(0, a.Start.Depth);
+                // a tree: every room but the start has exactly one door toward the start
+                Assert.All(a.Rooms.Values.Where(r => r != a.Start), r =>
+                    Assert.Equal(1, a.Doors(r).Count(s => a.Neighbor(r, s)!.Depth == r.Depth - 1)));
+                Assert.Equal(a.Rooms.Count - 1, a.Rooms.Values.Sum(r => a.Doors(r).Count()) / 2);
+                Assert.Equal(RoomKind.Boss, a.Boss.Kind);
+                Assert.Single(a.Rooms.Values, r => r.Kind == RoomKind.Boss);
+                Assert.Equal(a.Rooms.Values.Max(r => r.Depth), a.Boss.Depth);
+                Assert.Contains(a.Rooms.Values, r => r.Kind == RoomKind.Treasure);
+                Assert.Equal([EKind.Monolith], a.Boss.Guardians);
+            }
+    }
+
+    [Fact]
+    public void Rooms_deeper_and_on_later_floors_get_heavier_and_the_first_rooms_hold_only_light_enemies()
+    {
+        for (uint seed = 1; seed <= 25; seed++)
         {
-            var run = World.MakeRun(seed);
-            Assert.All(run[0].Enemies, k => Assert.Contains(k, new[] { EKind.Spike, EKind.Imp }));
-            Assert.All(run[1].Enemies, k => Assert.Contains(k, new[] { EKind.Spike, EKind.Imp, EKind.Orb }));
-            Assert.True(Weight(run[5]) > Weight(run[0]) + 4f, $"seed {seed}: {Weight(run[0])} -> {Weight(run[5])}");
-            Assert.All(run.Take(World.RunLength - 1), r => Assert.DoesNotContain(EKind.Monolith, r.Enemies));
+            var f0 = Dungeon.Make(seed, 0);
+            var f2 = Dungeon.Make(seed, Dungeon.Floors - 1);
+            foreach (var r in f0.Rooms.Values.Where(r => r.Depth == 1 && r.Kind == RoomKind.Fight))
+                Assert.All(r.Waves.SelectMany(x => x), k => Assert.Contains(k, new[] { EKind.Spike, EKind.Imp, EKind.Orb }));
+            float W(Dungeon d) => d.Rooms.Values.Where(r => r.Kind == RoomKind.Fight).Average(r => r.Waves.Sum(Weight));
+            Assert.True(W(f2) > W(f0) + 3f, $"seed {seed}: {W(f0)} -> {W(f2)}");
+            Assert.All(f0.Rooms.Values.Where(r => r.Kind != RoomKind.Boss), r => Assert.DoesNotContain(EKind.Monolith, r.Waves.SelectMany(x => x)));
         }
     }
 
@@ -108,17 +134,152 @@ public class RunTests
     }
 
     [Fact]
-    public void An_elite_room_opens_with_exactly_one_elite()
+    public void The_start_room_is_open_and_the_run_waits_there_until_you_take_a_door()
     {
-        var w = new World(seed: 5, waves: true);
-        w.Wave = World.EliteRooms[0] - 1;
-        w.Phase = Phase.Intermission;
-        w.PhaseT = 1;
+        var w = new World(seed: 4, waves: true);
+        Assert.Same(w.Map.Start, w.Room);
+        Assert.True(w.GatesOpen);
+        Run(w, 300);
+        Assert.Empty(w.Enemies);
+        Assert.Same(w.Map.Start, w.Room);
+    }
+
+    [Fact]
+    public void Walking_into_an_open_doorway_enters_the_room_behind_it_at_the_facing_door()
+    {
+        var w = new World(seed: 6, waves: true);
+        var side = w.Map.Doors(w.Room).First();
+        var next = w.Map.Neighbor(w.Room, side)!;
+        w.Player.Pos = Sides.Door(side) + Sides.Inward(side) * 40f;
+        var walk = new Inputs { Move = Vector2.Normalize(-Sides.Inward(side)) };
+        bool entered = false;
+        for (int i = 0; i < 40 && !entered; i++) { w.Step(walk); entered = w.Events.Any(x => x.Kind == Ev.RoomEnter); }
+        Assert.True(entered, "walking into the doorway changes room");
+        Assert.Same(next, w.Room);
+        Assert.True(next.Seen);
+        var back = Sides.Opposite(side);
+        Assert.True(Vector2.Distance(w.Player.Pos, Sides.Door(back)) < 120f, $"enters by the facing door, at {w.Player.Pos}");
+    }
+
+    [Fact]
+    public void The_gates_stay_shut_while_the_room_still_fights()
+    {
+        var w = InFight(7);
+        var room = w.Room;
+        Run(w, 60);
+        Assert.Equal(Phase.Fighting, w.Phase);
+        Assert.False(w.GatesOpen);
+        var side = w.Map.Doors(room).First();
+        w.Player.Pos = Sides.Door(side) + Sides.Inward(side) * 20f;
+        w.Player.Invuln = 100000;
+        Run(w, 30, new Inputs { Move = Vector2.Normalize(-Sides.Inward(side)) });
+        Assert.Same(room, w.Room);
+    }
+
+    [Fact]
+    public void A_fight_room_runs_its_waves_then_its_guardian_whose_death_opens_the_gates()
+    {
+        var w = InFight(3);
+        var room = w.Room;
+        Run(w, 52);
+        Assert.Equal(0, w.Wave);
+        Assert.Equal(room.Waves[0].Length, w.Enemies.Count);
+        for (int i = 0; i < room.Waves.Length; i++)
+        {
+            Assert.False(w.GuardianUp);
+            foreach (var e in w.Enemies) e.Hp = 0;
+            var ev = Run(w, 2);
+            Assert.Contains(ev, x => x.Kind == Ev.WaveClear);
+            Assert.Equal(Phase.Intermission, w.Phase);
+            Run(w, 72);
+        }
+        Assert.True(w.GuardianUp);
+        Assert.Equal(room.Guardians.Length, w.Enemies.Count);
+        Assert.All(w.Enemies, e => Assert.True(e.Elite && e.Guardian));
+        w.Player.Hp = 50;
+        foreach (var e in w.Enemies) e.Hp = 0;
+        var open = Run(w, 2);
+        Assert.Contains(open, x => x.Kind == Ev.GatesOpen);
+        Assert.True(w.GatesOpen);
+        Assert.True(room.Cleared);
+        Assert.Equal(50 + World.RoomClearHeal, w.Player.Hp);
+        Assert.Equal(3, w.Altars.Count);
+    }
+
+    [Fact]
+    public void An_elite_room_is_guarded_by_two_elites()
+    {
+        for (uint seed = 1; seed <= 20; seed++)
+        {
+            var w = new World(seed, waves: true);
+            var room = w.Map.Rooms.Values.FirstOrDefault(r => r.Kind == RoomKind.Elite);
+            if (room == null) continue;
+            Assert.Equal(2, room.Guardians.Length);
+            w.EnterRoom(room, Side.S);
+            w.Wave = room.Waves.Length - 1; w.Phase = Phase.Intermission; w.PhaseT = 1;
+            Run(w, 1);
+            Assert.Equal(2, w.Enemies.Count(e => e.Elite && e.Guardian));
+            return;
+        }
+        Assert.Fail("no seed in 1..20 made an elite room");
+    }
+
+    [Fact]
+    public void A_treasure_room_raises_altars_without_a_fight()
+    {
+        var w = InFight(2, RoomKind.Treasure);
+        Assert.True(w.GatesOpen);
+        Assert.True(w.Room.Cleared);
+        Assert.Equal(3, w.Altars.Count);
+        Run(w, 200);
+        Assert.Empty(w.Enemies);
+    }
+
+    [Fact]
+    public void A_cleared_room_stays_open_and_empty_when_you_come_back()
+    {
+        var w = InFight(8);
+        var room = w.Room;
+        GuardiansDown(w);
+        Run(w, 2);
+        w.EnterRoom(w.Map.Start, Side.N);
+        w.EnterRoom(room, Side.S);
+        Assert.True(w.GatesOpen);
+        Run(w, 200);
+        Assert.Empty(w.Enemies);
+    }
+
+    [Fact]
+    public void The_boss_opens_a_portal_and_the_portal_leads_to_the_next_floor()
+    {
+        var w = new World(seed: 11, waves: true);
+        w.EnterRoom(w.Map.Boss, Side.S);
+        GuardiansDown(w);
+        var ev = Run(w, 2);
+        Assert.Contains(ev, x => x.Kind == Ev.Portal);
+        Assert.True(w.PortalOpen);
+        Assert.Empty(w.Altars);
+        w.Player.Pos = World.PortalPos;
+        ev = Run(w, 2);
+        Assert.Contains(ev, x => x.Kind == Ev.NextFloor && x.I == 1);
+        Assert.Equal(1, w.Map.Floor);
+        Assert.Same(w.Map.Start, w.Room);
+    }
+
+    [Fact]
+    public void The_boss_grows_tougher_floor_by_floor_and_the_last_one_wins_the_run()
+    {
+        var w = new World(seed: 12, waves: true);
+        w.GoToFloor(Dungeon.Floors - 1);
+        w.EnterRoom(w.Map.Boss, Side.S);
+        w.Wave = w.Room.Waves.Length - 1; w.Phase = Phase.Intermission; w.PhaseT = 1;
         Run(w, 1);
-        Assert.Equal(World.EliteRooms[0], w.Wave);
-        Assert.Equal(w.Rooms[w.Wave].Enemies.Length, w.Enemies.Count);
-        Assert.Single(w.Enemies, e => e.Elite);
-        Assert.True(w.Enemies[0].Elite, "the room's first enemy leads it");
+        var boss = Assert.Single(w.Enemies, e => e.Boss);
+        Assert.Equal((int)(700 * (1f + 0.35f * (Dungeon.Floors - 1))), boss.MaxHp);
+        GuardiansDown(w);
+        var ev = Run(w, 2);
+        Assert.Equal(Phase.Won, w.Phase);
+        Assert.Contains(ev, x => x.Kind == Ev.Victory);
     }
 
     // ---------------------------------------------------------------- altars
@@ -128,9 +289,8 @@ public class RunTests
     {
         for (uint seed = 1; seed <= 20; seed++)
         {
-            var w = new World(seed, waves: true);
-            Run(w, 80);
-            foreach (var e in w.Enemies) e.Hp = 0;
+            var w = InFight(seed);
+            GuardiansDown(w);
             Run(w, 2);
             Assert.Equal(3, w.Altars.Count);
             var o = w.Altars.Select(a => a.Offer).ToArray();
@@ -140,41 +300,41 @@ public class RunTests
             Assert.Equal(OfferKind.Relic, o[2].Kind);
             Assert.NotEqual(o[1].Relic, o[2].Relic);
             Assert.All(o, x => Assert.False(string.IsNullOrEmpty(x.Title) || string.IsNullOrEmpty(x.Blurb)));
+            Assert.All(w.Altars, a => Assert.False(w.InsidePillar(a.Pos, Altar.Radius), $"seed {seed}: altar on a pillar"));
         }
     }
 
     [Fact]
     public void Badly_hurt_the_third_altar_holds_a_potion()
     {
-        var w = new World(seed: 2, waves: true);
-        Run(w, 80);
+        var w = InFight(2);
+        GuardiansDown(w);
         w.Player.Hp = 20;
-        foreach (var e in w.Enemies) e.Hp = 0;
         Run(w, 2);
-        Assert.Equal(45, w.Player.Hp); // the room-clear heal
+        Assert.Equal(20 + World.RoomClearHeal, w.Player.Hp);
         Assert.Equal(OfferKind.Heal, w.Altars[2].Offer.Kind);
         w.TakeAltar(2);
-        Assert.Equal(45 + Offer.HealAmount, w.Player.Hp);
+        Assert.Equal(20 + World.RoomClearHeal + Offer.HealAmount, w.Player.Hp);
     }
 
     [Fact]
     public void Cutting_an_altar_with_the_sword_takes_it_and_the_others_crumble()
     {
-        var w = new World(seed: 3, waves: true);
-        Run(w, 80);
-        foreach (var e in w.Enemies) e.Hp = 0;
+        var w = InFight(3);
+        GuardiansDown(w);
         Run(w, 2);
         var offer = w.Altars[1].Offer;
+        w.Pillars.Clear();
         w.Player.Pos = World.AltarSpots[1] + new Vector2(0f, 70f);
         var ev = Tap(w, new Inputs { Light = true, Aim = Up }, 20);
         Assert.Contains(ev, x => x.Kind == Ev.Reward && x.I == 1);
         Assert.Empty(w.Altars);
-        Assert.Equal(Phase.Intermission, w.Phase);
+        Assert.True(w.GatesOpen, "the gates stay open after the pick");
         Assert.Equal(1, w.Player.Has(offer.Relic));
     }
 
     [Fact]
-    public void A_swing_outside_the_reward_step_takes_nothing()
+    public void A_swing_while_the_room_still_fights_takes_nothing()
     {
         var w = WithAltar(new Offer(OfferKind.Relic, Relic: RKind.Sede));
         w.Phase = Phase.Fighting;

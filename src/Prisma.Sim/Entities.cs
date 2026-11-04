@@ -76,6 +76,8 @@ public sealed class Enemy
     public int Burn, BurnT;
     /// <summary>Elite: a bigger, tougher version that leads a room.</summary>
     public bool Elite;
+    /// <summary>Guards the room: the gates open when the last guardian falls.</summary>
+    public bool Guardian;
 
     public bool Alive => State != EState.Dead && Hp > 0;
     public bool Hittable => Alive && State != EState.Spawn;
@@ -113,10 +115,7 @@ public sealed class Enemy
     }
 }
 
-public enum RoomKind { Fight, Elite, Boss }
 
-/// <summary>One room of a run: what it spawns. In an elite room the first enemy is the elite.</summary>
-public sealed record Room(RoomKind Kind, EKind[] Enemies);
 
 /// <summary>
 /// A bomb lobbed in an arc from From to To over Flight frames; it bursts on landing and hurts everyone in Radius.
@@ -149,10 +148,12 @@ public enum Ev
     Altars, Reward, Burn, Heal,
     /// <summary>Block: a shield turned a cut aside. Lob: a bomb was thrown. Explode: one burst (A = radius, I = 1 if batted back).</summary>
     Block, Lob, Explode,
+    /// <summary>RoomEnter (A = RoomKind, I = floor), Guardian rose (A = how many, I = kind), GatesOpen, Portal, NextFloor (I = floor).</summary>
+    RoomEnter, Guardian, GatesOpen, Portal, NextFloor,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>
 public readonly record struct GameEvent(Ev Kind, Vector2 Pos, float A = 0f, int I = 0);
 
-/// <summary>Intermission: the pause before a room. Reward: the room is clear and the altars wait for a pick.</summary>
-public enum Phase { Intermission, Fighting, Reward, Won, Lost }
+/// <summary>Intermission: the pause before a wave. Explore: the room is clear, its gates open (and its altars up).</summary>
+public enum Phase { Intermission, Fighting, Explore, Won, Lost }

@@ -22,15 +22,18 @@ public sealed partial class World
 
     public World(uint seed = 7, bool waves = true, bool pillars = true)
     {
-        if (pillars) Pillars.AddRange(PillarLayout);
         Rng = new Rng(seed);
         runRng = new Rng(seed * 2654435761u + 1u);
-        Rooms = MakeRun(seed);
+        runSeed = seed;
         Player.Pos = new Vector2(0f, 120f);
         Player.Facing = -MathF.PI / 2f;
         AutoWaves = waves;
-        Phase = waves ? Phase.Intermission : Phase.Fighting;
-        PhaseT = 70;
+        GoToFloor(0);
+        if (!waves) { Phase = Phase.Fighting; Pillars.Clear(); }
+        if (pillars && !waves) Pillars.AddRange(PillarLayout);
+        if (!pillars) Pillars.Clear();
+        Player.Pos = new Vector2(0f, 120f);
+        Events.Clear();
     }
 
     void Emit(Ev kind, Vector2 pos, float a = 0f, int i = 0) => Events.Add(new GameEvent(kind, pos, a, i));
@@ -267,7 +270,7 @@ public sealed partial class World
         }
         foreach (var b in Bombs)
             if (!b.Friendly && b.T < b.Flight - 2f && InArc(b.Ground, 14f, s.Reach, lo, hi)) BatBomb(b);
-        if (Phase == Phase.Reward)
+        if (GatesOpen && Altars.Count > 0)
             for (int i = 0; i < Altars.Count; i++)
                 if (InArc(Altars[i].Pos, Altar.Radius, s.Reach, lo, hi)) { TakeAltar(i); break; }
     }

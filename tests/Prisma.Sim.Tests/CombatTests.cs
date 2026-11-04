@@ -280,30 +280,6 @@ public class CombatTests
     }
 
     [Fact]
-    public void Clearing_a_room_heals_raises_altars_and_taking_one_brings_the_next()
-    {
-        var w = new World(seed: 3, waves: true);
-        Run(w, 80);
-        Assert.Equal(0, w.Wave);
-        Assert.Equal(w.Rooms[0].Enemies.Length, w.Enemies.Count);
-        w.Player.Hp = 50;
-        foreach (var e in w.Enemies) e.Hp = 0;
-        var ev = Run(w, 2);
-        Assert.Equal(Phase.Reward, w.Phase);
-        Assert.Equal(75, w.Player.Hp);
-        Assert.Contains(ev, x => x.Kind == Ev.Altars && x.I == 3);
-        Run(w, 300);
-        Assert.Equal(Phase.Reward, w.Phase); // the run waits for a pick
-        Assert.Equal(0, w.Wave);
-        w.TakeAltar(1);
-        Assert.Empty(w.Altars);
-        Assert.Equal(Phase.Intermission, w.Phase);
-        Run(w, 100);
-        Assert.Equal(1, w.Wave);
-        Assert.Equal(w.Rooms[1].Enemies.Length, w.Enemies.Count);
-    }
-
-    [Fact]
     public void A_spike_telegraphs_then_charges_into_the_player()
     {
         var w = Arena();
@@ -341,7 +317,10 @@ public class CombatTests
     public void A_leftover_shot_cannot_turn_a_victory_into_a_defeat()
     {
         var w = new World(seed: 4, waves: true);
-        w.Wave = w.Rooms.Count - 1;
+        w.GoToFloor(Dungeon.Floors - 1);
+        w.EnterRoom(w.Map.Boss, Side.S);
+        w.Wave = w.Room.Waves.Length;
+        w.GuardianUp = true;
         w.Phase = Phase.Fighting;
         w.Player.Hp = 5;
         w.Projs.Add(new Proj { Pos = w.Player.Pos + new Vector2(200f, 0f), Vel = new Vector2(-300f, 0f), Life = 4f, Damage = 10 });
@@ -350,7 +329,7 @@ public class CombatTests
         Assert.Empty(w.Projs);
         w.HurtPlayer(10, w.Player.Pos, null);
         Assert.Equal(Phase.Won, w.Phase);
-        Assert.Equal(5, w.Player.Hp);
+        Assert.Equal(5 + World.RoomClearHeal, w.Player.Hp);
     }
 
     [Fact]
@@ -561,8 +540,12 @@ public class CombatTests
         for (uint seed = 1; seed <= 40; seed++)
         {
             var w = new World(seed, waves: true);
-            w.Player.Pos = w.Pillars[(int)(seed % 4)].Pos + new Vector2(0f, 60f); // near stone, so the picker has to avoid it
-            for (int i = 0; i < 80; i++) w.Step(default);
+            var room = w.Map.Rooms.Values.First(r => r.Kind == RoomKind.Fight);
+            room.Layout = seed % 2 == 0 ? 0 : 3; // layouts with pillars
+            w.EnterRoom(room, Side.S);
+            w.Player.Pos = w.Pillars[(int)(seed % (uint)w.Pillars.Count)].Pos + new Vector2(0f, 60f); // near stone, so the picker has to avoid it
+            for (int i = 0; i < 52; i++) w.Step(default);
+            Assert.NotEmpty(w.Enemies);
             foreach (var e in w.Enemies)
                 Assert.False(w.InsidePillar(e.Pos, 50f), $"seed {seed}: spawned at {e.Pos}");
         }
@@ -609,13 +592,14 @@ public class CombatTests
     }
 
     [Fact]
-    public void A_wave_clear_heal_keeps_health_plus_recoverable_within_max()
+    public void A_room_clear_heal_keeps_health_plus_recoverable_within_max()
     {
         var w = new World(seed: 5, waves: true);
-        Run(w, 80);
+        w.EnterRoom(w.Map.Rooms.Values.First(r => r.Kind == RoomKind.Fight), Side.S);
+        w.Wave = w.Room.Waves.Length; w.GuardianUp = true; w.Phase = Phase.Fighting; w.Enemies.Clear();
         w.Player.Hp = 90; w.Player.Recover = 10;
-        foreach (var e in w.Enemies) e.Hp = 0;
         Run(w, 2);
+        Assert.True(w.GatesOpen);
         Assert.Equal(100, w.Player.Hp);
         Assert.Equal(0, w.Player.Recover);
     }
