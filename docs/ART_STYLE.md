@@ -96,7 +96,15 @@ cabeça de ferro com cinta de latão e um espigão atrás.
 
 ## Letras
 
-- Texto do jogo: fonte manuscrita do Windows (`Ink.Hand`: Ink Free, Segoe Print...), com halo de papel.
+- Texto do jogo: **Caveat Brush** (`Ink.Hand`) com halo de papel, e kanji em **Yuji Boku** (`Hud.Kanji`). As duas são OFL e vêm junto com o jogo, em `assets/fonts`. As fontes do Windows ficam só de reserva.
+- **Crítico:** número grande em vermelho (`CritCol`) com 会心 em cima. Ele aparece maior e encolhe, e solta um anel vermelho.
+- **Quebra de guarda:** um 破 vermelho carimbado sobre o inimigo, do tamanho dele. Cai grande, assenta e some.
+- **Quadro de impacto:** um quadro em negativo de tinta, em que o claro vira tinta, o escuro vira papel e o vermelho continua vermelho. Aparece no máximo uma vez por segundo, pode ser desligado em Configurações e só dispara nos golpes grandes (crítico pesado, quebra de guarda de inimigo grande ou de sala com poucos inimigos, vitória).
+- **Tela:**
+  - tinta respingada nas bordas quando o herói apanha (só nas bordas);
+  - vinheta vermelho-escura que pulsa abaixo de 30% de vida;
+  - linhas de velocidade das bordas para dentro no dash e no dash perfeito;
+  - câmera lenta (¼) de meio segundo, com a câmera se aproximando do último abate da sala.
 - Anúncios: kanji em pincel (`Hud.Kanji`: HGGyoshotai, Yu Mincho...). 第一波 (onda um), 守護者 (guardião),
   決戦 (chefe), 開門 (portões abertos), 第二層 (fase dois), 完璧 (perfeito), 勝利 (vitória), 敗北 (derrota).
 - O anúncio de rodada: uma pincelada vermelha cresce da esquerda para a direita em 0,18 s, gotas voam, o kanji

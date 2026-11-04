@@ -47,6 +47,8 @@ public sealed class Player
     public int Has(RKind k) => Relics[(int)k];
     public int PerfectWindow => Tune.PerfectFrames + Weapon.PerfectBonus;
     public float DamageMul => 1f + Prisma.Sim.Relics.AfiacaoMul * Has(RKind.Afiacao);
+    /// <summary>Chance a landed cut is critical (Relics.CritMul damage).</summary>
+    public float CritChance => Prisma.Sim.Relics.CritChance;
     public float FocusMul => Weapon.FocusGain * (1f + Prisma.Sim.Relics.FocoMul * Has(RKind.Foco));
     /// <summary>Wind boots stack, but never below 40% of the weapon's recharge (three pairs used to make it ~0).</summary>
     public int DashCooldown => Math.Max(6, (int)MathF.Round(Weapon.DashCooldown * MathF.Max(Prisma.Sim.Relics.PeLeveFloor, MathF.Pow(Prisma.Sim.Relics.PeLeveMul, Has(RKind.PeLeve)))));
@@ -163,6 +165,8 @@ public enum Ev
     GuardBreak,
     /// <summary>SpawnMark: an enemy will step in here in A frames (I = kind): the view inks a mark on the floor.</summary>
     SpawnMark,
+    /// <summary>Crit: the next Hit is a critical cut (A = its damage, I = 1 if heavy, K = kind). Sent just before that Hit.</summary>
+    Crit,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>

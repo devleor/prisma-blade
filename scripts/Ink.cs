@@ -19,9 +19,16 @@ public static class Ink
     /// <summary>Handwritten system font when Windows has one (Ink Free, Segoe Print), the default font otherwise.</summary>
     public static readonly Font Hand = MakeFont();
 
-    static Font MakeFont()
+    /// <summary>Caveat Brush (OFL, bundled in assets/fonts); the old system faces stay as fallbacks for missing glyphs.</summary>
+    static Font MakeFont() => Bundled("res://assets/fonts/CaveatBrush-Regular.ttf",
+        new SystemFont { FontNames = ["Ink Free", "Segoe Print", "Comic Sans MS", "Bradley Hand"], FontWeight = 600 });
+
+    /// <summary>A font shipped with the game, falling back to <paramref name="fallback"/> when the file is missing.</summary>
+    public static Font Bundled(string path, Font fallback)
     {
-        var f = new SystemFont { FontNames = ["Ink Free", "Segoe Print", "Comic Sans MS", "Bradley Hand"], FontWeight = 600 };
+        if (!ResourceLoader.Exists(path)) return fallback;
+        var f = GD.Load<FontFile>(path);
+        f.Fallbacks = [fallback];
         return f;
     }
 

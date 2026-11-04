@@ -51,6 +51,51 @@ public class CombatTests
     }
 
     [Fact]
+    public void About_one_cut_in_twenty_is_critical_for_more_damage_and_is_announced_before_its_hit()
+    {
+        var w = Arena();
+        var e = Dummy(w, EKind.Bastion, Up * 70f);
+        var crits = new List<GameEvent>();
+        int hits = 0;
+        for (int i = 0; i < 400; i++)
+        {
+            e.Hp = 1_000_000; e.Pos = w.Player.Pos + Up * 70f; e.Vel = Vector2.Zero;
+            var ev = Tap(w, new Inputs { Light = true, Aim = Up }, 30);
+            for (int k = 0; k < ev.Count; k++)
+            {
+                if (ev[k].Kind == Ev.Hit) hits++;
+                if (ev[k].Kind != Ev.Crit) continue;
+                crits.Add(ev[k]);
+                Assert.True(k + 1 < ev.Count && ev[k + 1].Kind == Ev.Hit && ev[k + 1].A == ev[k].A, "the crit comes right before its hit, same damage");
+            }
+        }
+        Assert.True(hits > 250, $"the dummy kept being hit ({hits})");
+        Assert.InRange(crits.Count / (double)hits, 0.02, 0.09);
+        var critDamage = Moves.Light.Select(m => (float)Math.Ceiling(m.Damage * Relics.CritMul - 0.001f)).ToHashSet();
+        Assert.All(crits, c => Assert.Contains(c.A, critDamage));
+    }
+
+    [Fact]
+    public void Crits_are_the_same_on_a_replay_of_the_same_run()
+    {
+        List<float> Play()
+        {
+            var w = Arena();
+            var e = Dummy(w, EKind.Bastion, Up * 70f);
+            var got = new List<float>();
+            for (int i = 0; i < 120; i++)
+            {
+                e.Hp = 1_000_000; e.Pos = w.Player.Pos + Up * 70f; e.Vel = Vector2.Zero;
+                got.AddRange(Tap(w, new Inputs { Light = true, Aim = Up }, 30).Where(x => x.Kind == Ev.Crit).Select(x => (float)w.Frame));
+            }
+            return got;
+        }
+        var a = Play();
+        Assert.NotEmpty(a);
+        Assert.Equal(a, Play());
+    }
+
+    [Fact]
     public void A_light_swing_hits_an_enemy_in_front_once()
     {
         var w = Arena();

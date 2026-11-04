@@ -64,3 +64,12 @@ All CC0 1.0 / public domain; no attribution required (credits given anyway). Raw
 | particles/smoke_dark.png | same | blackSmoke10.png (downscaled) | Kenney | CC0 |
 | particles/smoke_dark2.png | same | blackSmoke20.png (downscaled) | Kenney | CC0 |
 | particles/spark_flash.png | same | flash00.png (downscaled) | Kenney | CC0 |
+
+## Fontes (`assets/fonts`)
+
+Licença SIL Open Font License 1.1: podem ser distribuídas com o jogo, desde que o arquivo de licença vá junto. A licença de cada fonte está na mesma pasta.
+
+| Arquivo | Fonte | Origem | Autor | Licença |
+|---|---|---|---|---|
+| CaveatBrush-Regular.ttf | Caveat Brush (texto e números: `Ink.Hand`) | https://github.com/google/fonts/tree/main/ofl/caveatbrush | Impallari Type | OFL 1.1 (`CaveatBrush-OFL.txt`) |
+| YujiBoku-Regular.ttf | Yuji Boku (kanji: `Hud.Kanji`) | https://github.com/google/fonts/tree/main/ofl/yujiboku | Kinuta Font Factory | OFL 1.1 (`YujiBoku-OFL.txt`) |

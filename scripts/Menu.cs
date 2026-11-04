@@ -55,7 +55,7 @@ public partial class Menu : Control
         {
             case Page.Title: items.AddRange(["JOGAR", "CONFIGURAÇÕES", "SAIR"]); break;
             case Page.Pause: items.AddRange(["CONTINUAR", "CONFIGURAÇÕES", "RECOMEÇAR", "MENU PRINCIPAL"]); break;
-            case Page.Settings: items.AddRange(["Volume geral", "Música", "Efeitos", "Tremor de tela", "Tela cheia", "VOLTAR"]); break;
+            case Page.Settings: items.AddRange(["Volume geral", "Música", "Efeitos", "Tremor de tela", "Tela cheia", "Quadro de impacto", "VOLTAR"]); break;
         }
         glow = new float[items.Count];
         Selected = 0;
@@ -110,7 +110,7 @@ public partial class Menu : Control
         if (Current != Page.Settings) return;
         int i = Selected;
         if (IsSlider(i)) SetSlider(i, Mathf.Clamp(SliderValue(i) + d * 0.1f, 0f, 1f));
-        else if (i == 4) Toggle();
+        else if (i is 4 or 5) Toggle(i);
     }
 
     public void Confirm()
@@ -127,7 +127,8 @@ public partial class Menu : Control
             case (Page.Pause, "CONTINUAR"): Go("resume"); break;
             case (Page.Pause, "RECOMEÇAR"): Go("restart"); break;
             case (Page.Pause, "MENU PRINCIPAL"): Go("title"); break;
-            case (Page.Settings, "Tela cheia"): Toggle(); break;
+            case (Page.Settings, "Tela cheia"): Toggle(4); break;
+            case (Page.Settings, "Quadro de impacto"): Toggle(5); break;
             case (Page.Settings, "VOLTAR"): Settings.Save(); Open(back); break;
             case (Page.Settings, _): break; // sliders change with left/right or a click
         }
@@ -170,9 +171,10 @@ public partial class Menu : Control
         Splash(SliderKnob(i), 0.35f);
     }
 
-    void Toggle()
+    void Toggle(int i)
     {
-        Settings.Fullscreen = !Settings.Fullscreen;
+        if (i == 4) Settings.Fullscreen = !Settings.Fullscreen;
+        else Settings.ImpactFrames = !Settings.ImpactFrames;
         Settings.Apply();
     }
 
@@ -366,8 +368,8 @@ public partial class Menu : Control
         }
 
         if (IsSliderItem(i)) DrawSlider(i, c.Y - 10f, sel);
-        else if (settings && i == 4)
-            Ink.Write(this, new Vector2(SliderX0 + SliderW / 2, c.Y), Settings.Fullscreen ? "sim" : "não", 30, sel && g > 0.4f ? Ink.Paper : Ink.Line, 300f, !sel);
+        else if (settings && i is 4 or 5)
+            Ink.Write(this, new Vector2(SliderX0 + SliderW / 2, c.Y), (i == 4 ? Settings.Fullscreen : Settings.ImpactFrames) ? "sim" : "não", 30, sel && g > 0.4f ? Ink.Paper : Ink.Line, 300f, !sel);
     }
 
     void DrawSlider(int i, float y, bool sel)

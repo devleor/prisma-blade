@@ -318,6 +318,8 @@ public sealed partial class World
             return;
         }
         float mul = p.DamageMul;
+        bool crit = CritRoll(e.Id, p.SwingId) < p.CritChance;
+        if (crit) mul *= Relics.CritMul;
         bool echo = p.EchoReady;
         if (echo) { mul *= 2f; p.EchoReady = false; }
         // round up once a relic raises damage, so a stack never vanishes on a light cut (3 * 1.15 still gives 4)
@@ -326,9 +328,19 @@ public sealed partial class World
         if (p.Has(RKind.Brasa) > 0) { e.Burn = Relics.BurnFrames * p.Has(RKind.Brasa); }
         Damage(e, dmg, dir, s.Knock, s.Poise, heavy ? 28f : 16f);
         e.Fracture = Math.Min(Tune.MaxFracture, e.Fracture + fracture);
-        Hitstop = Math.Max(Hitstop, s.Hitstop + (echo ? 4 : 0));
+        Hitstop = Math.Max(Hitstop, s.Hitstop + (echo ? 4 : 0) + (crit ? Relics.CritHitstop : 0));
         AddFocus(heavy ? 10f : 4f);
+        if (crit) Emit(Ev.Crit, e.Pos, dmg, heavy ? 1 : 0, (int)e.Kind);
         Emit(Ev.Hit, e.Pos, dmg, heavy || echo ? 1 : 0, (int)e.Kind);
+    }
+
+    /// <summary>A steady 0..1 roll for one swing on one enemy: the same run replays the same crits, and the roll
+    /// does not draw from Rng, so crits never shift spawns or anything else the run decides.</summary>
+    float CritRoll(int enemy, int swing)
+    {
+        uint h = runSeed * 0x9E3779B1u ^ (uint)enemy * 0x85EBCA77u ^ (uint)swing * 0xC2B2AE3Du ^ (uint)Frame * 0x27D4EB2Fu;
+        h ^= h >> 15; h *= 0x2C1B3C6Du; h ^= h >> 12; h *= 0x297A2D39u; h ^= h >> 15;
+        return (h & 0xFFFFFF) / 16777216f;
     }
 
     /// <summary>Damage, poise and knockback for any source. Armoured enemies only flinch once their poise breaks.</summary>

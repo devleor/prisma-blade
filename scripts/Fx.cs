@@ -8,13 +8,15 @@ public partial class Fx : Node2D
     struct Shard { public Vector2 Pos, Vel; public float Rot, Spin, Size, Life, Max; public Color Col; }
     struct Spark { public Vector2 Pos, Vel; public float Life, Max; public Color Col; }
     struct RingFx { public Vector2 Pos; public float R0, R1, Life, Max, Width; public Color Col; }
-    struct Text { public Vector2 Pos; public string S; public float Life; public Color Col; public int Size; }
+    struct Text { public Vector2 Pos; public string S; public float Life, Max; public Color Col; public int Size; public string? Kanji; }
+    struct StampFx { public Vector2 Pos; public string S; public float Size, Rot, Life, Max; public Color Col; }
     struct PuffFx { public Vector2 Pos, Vel; public float Rot, Scale, Life, Max; public Color Col; public int Tex; }
 
     readonly List<Shard> shards = [];
     readonly List<Spark> sparks = [];
     readonly List<RingFx> rings = [];
     readonly List<Text> texts = [];
+    readonly List<StampFx> stamps = [];
     readonly List<PuffFx> puffs = [];
     readonly Texture2D?[] puffTex =
     [
@@ -24,7 +26,7 @@ public partial class Fx : Node2D
     static Texture2D? Load(string path) => ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
     readonly RandomNumberGenerator rng = new();
 
-    public int Count => shards.Count + sparks.Count + rings.Count + texts.Count + puffs.Count;
+    public int Count => shards.Count + sparks.Count + rings.Count + texts.Count + puffs.Count + stamps.Count;
 
     /// <summary>Dust clouds (CC0 smoke sprites tinted): wall hits, bowling, dash starts.</summary>
     public void Puff(Vector2 pos, Color col, float scale, int n)
@@ -67,8 +69,18 @@ public partial class Fx : Node2D
     public void Ring(Vector2 pos, float r0, float r1, float time, Color col, float width = 4f) =>
         rings.Add(new RingFx { Pos = pos, R0 = r0, R1 = r1, Life = time, Max = time, Col = col, Width = width });
 
-    public void Number(Vector2 pos, string s, Color col, int size = 22) =>
-        texts.Add(new Text { Pos = pos + new Vector2(rng.RandfRange(-10, 10), -20), S = s, Life = 0.7f, Col = col, Size = size });
+    /// <summary>A number or word that rises and fades; with a kanji (会心 on a crit) it pops in bigger and lasts longer.</summary>
+    public void Number(Vector2 pos, string s, Color col, int size = 22, string? kanji = null)
+    {
+        float life = kanji != null ? 1.0f : 0.7f;
+        texts.Add(new Text { Pos = pos + new Vector2(rng.RandfRange(-10, 10), -20), S = s, Life = life, Max = life, Col = col, Size = size, Kanji = kanji });
+    }
+
+    /// <summary>A brush kanji slammed onto the arena (破 on a guard break): it lands big, settles, then fades.</summary>
+    public void Stamp(Vector2 pos, string s, float size, Color col, float life = 0.75f) =>
+        stamps.Add(new StampFx { Pos = pos, S = s, Size = size, Rot = rng.RandfRange(-0.25f, 0.25f), Life = life, Max = life, Col = col });
+
+    public int Stamps => stamps.Count;
 
     public override void _Process(double delta)
     {
@@ -112,6 +124,13 @@ public partial class Fx : Node2D
             t.Pos += new Vector2(0, -60 * dt);
             texts[i] = t;
         }
+        for (int i = stamps.Count - 1; i >= 0; i--)
+        {
+            var s = stamps[i];
+            s.Life -= dt;
+            if (s.Life <= 0) { stamps.RemoveAt(i); continue; }
+            stamps[i] = s;
+        }
         QueueRedraw();
     }
 
@@ -153,11 +172,34 @@ public partial class Fx : Node2D
             var c = s.Col; c.A *= s.Life / s.Max;
             DrawLine(s.Pos, s.Pos - s.Vel * 0.035f, c, 3f);
         }
-        var font = ThemeDB.FallbackFont;
+        var font = Ink.Hand;
         foreach (var t in texts)
         {
-            var c = t.Col; c.A *= Mathf.Clamp(t.Life * 3, 0, 1);
-            DrawString(font, t.Pos - new Vector2(40, 0), t.S, HorizontalAlignment.Center, 80, t.Size, c);
+            float a = Mathf.Clamp(t.Life * 3, 0, 1), age = t.Max - t.Life;
+            var c = t.Col; c.A *= a;
+            var halo = new Color(Ink.Paper, 0.85f * a);
+            float pop = t.Kanji != null ? 1f + 0.7f * Mathf.Max(0f, 1f - age / 0.12f) : 1f;
+            DrawSetTransform(t.Pos, 0f, new Vector2(pop, pop));
+            DrawStringOutline(font, new Vector2(-60, 0), t.S, HorizontalAlignment.Center, 120, t.Size, Mathf.Max(4, t.Size / 6), halo);
+            DrawString(font, new Vector2(-60, 0), t.S, HorizontalAlignment.Center, 120, t.Size, c);
+            if (t.Kanji != null)
+            {
+                int ks = t.Size / 2;
+                DrawStringOutline(Hud.Kanji, new Vector2(-60, -t.Size * 0.85f), t.Kanji, HorizontalAlignment.Center, 120, ks, 4, halo);
+                DrawString(Hud.Kanji, new Vector2(-60, -t.Size * 0.85f), t.Kanji, HorizontalAlignment.Center, 120, ks, new Color(Ink.Line, a));
+            }
         }
+        foreach (var s in stamps)
+        {
+            float age = s.Max - s.Life, k = Mathf.Clamp(age / 0.1f, 0f, 1f);
+            float scale = Mathf.Lerp(1.8f, 1f, 1f - (1f - k) * (1f - k));
+            float a = Mathf.Clamp(s.Life / (s.Max * 0.4f), 0f, 1f) * Mathf.Clamp(age / 0.04f, 0f, 1f);
+            DrawSetTransform(s.Pos, s.Rot, new Vector2(scale, scale));
+            int size = (int)s.Size;
+            var at = new Vector2(-size, size * 0.35f);
+            DrawStringOutline(Hud.Kanji, at, s.S, HorizontalAlignment.Center, size * 2, size, Mathf.Max(6, size / 7), new Color(Ink.Paper, 0.9f * a));
+            DrawString(Hud.Kanji, at, s.S, HorizontalAlignment.Center, size * 2, size, new Color(s.Col, a));
+        }
+        DrawSetTransform(Vector2.Zero, 0, Vector2.One);
     }
 }

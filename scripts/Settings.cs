@@ -13,6 +13,8 @@ public static class Settings
 
     public static float Master = 0.8f, Music = 0.7f, Effects = 0.9f, Shake = 1f;
     public static bool Fullscreen;
+    /// <summary>The one-frame ink negative on the biggest blows (some players find flashes uncomfortable).</summary>
+    public static bool ImpactFrames = true;
     /// <summary>Off in the automated checks, so a test never overwrites the player's file.</summary>
     public static bool Persist = true;
 
@@ -32,6 +34,8 @@ public static class Settings
             Shake = Unit(cfg, "video", "shake", Shake);
             var fs = cfg.GetValue("video", "fullscreen", Fullscreen);
             Fullscreen = fs.VariantType == Variant.Type.Bool ? fs.AsBool() : Fullscreen;
+            var im = cfg.GetValue("video", "impact_frames", ImpactFrames);
+            ImpactFrames = im.VariantType == Variant.Type.Bool ? im.AsBool() : ImpactFrames;
         }
         Apply();
     }
@@ -45,6 +49,7 @@ public static class Settings
         cfg.SetValue("audio", "effects", Effects);
         cfg.SetValue("video", "shake", Shake);
         cfg.SetValue("video", "fullscreen", Fullscreen);
+        cfg.SetValue("video", "impact_frames", ImpactFrames);
         cfg.Save(Path);
     }
 

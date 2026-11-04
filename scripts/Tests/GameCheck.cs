@@ -104,6 +104,22 @@ public partial class GameCheck : Node
                 main.Hud.Round(1, "ONDA 1/2");
                 Check(main.Hud.SplashLeft > 0 && main.Hud.SplashLabel == "ONDA 1/2", "the round splash starts");
                 Check(Hud.Kanji.GetStringSize("第一波").X > 0 && Ink.Hand.GetStringSize("onda").X > 0, "the brush and handwriting fonts load");
+                Check(Hud.Kanji is FontFile && Ink.Hand is FontFile, "both fonts are the bundled OFL files, not system fonts");
+                {
+                    var at = main.World.Player.Pos + new V(0, -80);
+                    int fxBefore = main.Fx.Count;
+                    main.React(new GameEvent(Ev.Crit, at, 18f, 0, (int)EKind.Bastion));
+                    main.React(new GameEvent(Ev.Hit, at, 18f, 0, (int)EKind.Bastion));
+                    Check(main.Fx.Count > fxBefore, "a critical hit shows its number and burst");
+                    bool impactWas = Settings.ImpactFrames;
+                    Settings.ImpactFrames = false;
+                    main.React(new GameEvent(Ev.GuardBreak, at, 40f, (int)EKind.Ogre));
+                    Check(main.Fx.Stamps > 0, "a guard break stamps 破 on the arena");
+                    Check(!main.Hud.Impact(), "impact frames stay off when the setting is off");
+                    Settings.ImpactFrames = true;
+                    Check(main.Hud.Impact() && !main.Hud.Impact(), "an impact frame fires, and never twice within a second");
+                    Settings.ImpactFrames = impactWas;
+                }
                 main.OpenPause();
                 break;
             case 264:
@@ -118,6 +134,8 @@ public partial class GameCheck : Node
             case 277:
                 Check(!GetTree().Paused && main.Pause == null, "Esc closes the pause menu");
                 Check(main.World.Frame > frozenAt, "the game runs again");
+                main.React(new GameEvent(Ev.GatesOpen, main.World.Player.Pos, 0f, 0));
+                Check(main.KillCamOn && Engine.TimeScale < 0.5, "clearing a room slows time for the last blow");
                 AddChild(menu = new Menu { Live = false, Size = new Vector2(1280, 720) });
                 break;
             case 279:
@@ -133,9 +151,18 @@ public partial class GameCheck : Node
                 Check(main.Sfx.GetChildren().OfType<AudioStreamPlayer>().All(a => a.Bus == Settings.SfxBus || a.Bus == Settings.MusicBus), "every player sits on the music or effects bus");
                 menu.Move(1); menu.Adjust(-1); menu.Adjust(-1);
                 Check(Settings.Shake < shakeBefore, "screen shake can be turned down");
+                {
+                    bool before = Settings.ImpactFrames;
+                    menu.Move(2);
+                    Check(menu.Items[menu.Selected] == "Quadro de impacto", "the settings offer the impact frame toggle");
+                    menu.Adjust(1);
+                    Check(Settings.ImpactFrames != before, "and it switches the impact frames");
+                    menu.Adjust(1);
+                }
                 break;
             case 330:
                 Check(menu!.StainCount > 0, $"choosing flicks ink that stays on the page ({menu.StainCount})");
+                Check(!main.KillCamOn && Engine.TimeScale == 1.0, "and time runs normally again after it");
                 menu.Cancel();
                 Check(menu.Current == Menu.Page.Title, "Esc goes back from settings");
                 Check(menu.Selected == 0, "back on the title page the choice is JOGAR again");

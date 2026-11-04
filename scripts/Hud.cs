@@ -25,12 +25,12 @@ public partial class Hud : Control
     public string SplashLabel => splashLabel;
     public float SplashLeft => splashT;
 
-    /// <summary>A brush-script Japanese face when Windows has one, a plain Japanese face otherwise.</summary>
-    public static readonly Font Kanji = new SystemFont
+    /// <summary>Yuji Boku, a brush Japanese face (OFL, bundled); system Japanese faces as fallback.</summary>
+    public static readonly Font Kanji = Ink.Bundled("res://assets/fonts/YujiBoku-Regular.ttf", new SystemFont
     {
-        FontNames = ["HGGyoshotai", "HGSeikaishotaiPRO", "HGSoeiKakupoptai", "Yu Mincho", "MS Mincho", "Yu Gothic", "Meiryo", "MS Gothic"],
+        FontNames = ["HGGyoshotai", "HGSeikaishotaiPRO", "Yu Mincho", "MS Mincho", "Yu Gothic", "Meiryo", "MS Gothic"],
         FontWeight = 800,
-    };
+    });
 
     static readonly string[] Numerals = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
     static string Num(int n) => n >= 0 && n < Numerals.Length ? Numerals[n] : n.ToString();
@@ -40,6 +40,119 @@ public partial class Hud : Control
         this.main = main;
         SetAnchorsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Ignore;
+        impactRect = new ColorRect { Visible = false, MouseFilter = MouseFilterEnum.Ignore, Material = new ShaderMaterial { Shader = new Shader { Code = ImpactShader } } };
+        impactRect.SetAnchorsPreset(LayoutPreset.FullRect);
+        AddChild(impactRect);
+    }
+
+    // ---------------------------------------------------------------- screen effects
+
+    /// <summary>The screen as an ink negative: light becomes ink, dark becomes paper, strong reds stay red.</summary>
+    const string ImpactShader = @"shader_type canvas_item;
+uniform sampler2D screen : hint_screen_texture, filter_linear;
+void fragment() {
+    vec3 c = texture(screen, SCREEN_UV).rgb;
+    float l = dot(c, vec3(0.3, 0.59, 0.11));
+    vec3 ink = vec3(0.07, 0.06, 0.05), paper = vec3(0.94, 0.9, 0.8);
+    vec3 o = mix(paper, ink, smoothstep(0.32, 0.42, l));
+    if (c.r > 0.3 && c.r > c.g * 1.8 && c.r > c.b * 1.8) o = vec3(0.78, 0.06, 0.05);
+    COLOR = vec4(o, 1.0);
+}";
+
+    readonly ColorRect impactRect;
+    float impactT;
+    ulong lastImpact;
+
+    /// <summary>A one-frame ink negative on a big blow. Off in the settings; never more than one per second,
+    /// so a big wave breaking guards one after another does not strobe.</summary>
+    public bool Impact()
+    {
+        ulong now = Time.GetTicksMsec();
+        if (!Settings.ImpactFrames || now - lastImpact < 1000 && lastImpact != 0) return false;
+        lastImpact = now;
+        impactT = 0.075f;
+        return true;
+    }
+
+    public bool ImpactShowing => impactRect.Visible;
+
+    struct Splat { public Vector2 Pos; public float R, Rot, Life; public int Seed; }
+    readonly List<Splat> splats = [];
+    readonly RandomNumberGenerator fxRng = new();
+
+    /// <summary>Ink flung onto the edges of the screen when the hero is hit (only the edges: the fight stays clear).</summary>
+    void SplatEdges(int n)
+    {
+        var size = Size;
+        for (int i = 0; i < n; i++)
+        {
+            int side = fxRng.RandiRange(0, 3);
+            float t = fxRng.RandfRange(0.05f, 0.95f);
+            var at = side switch
+            {
+                0 => new Vector2(t * size.X, 0), 1 => new Vector2(size.X, t * size.Y),
+                2 => new Vector2(t * size.X, size.Y), _ => new Vector2(0, t * size.Y),
+            };
+            splats.Add(new Splat { Pos = at, R = fxRng.RandfRange(40f, 95f), Rot = fxRng.RandfRange(0, Mathf.Tau), Life = 1.6f, Seed = fxRng.RandiRange(1, 99999) });
+        }
+        if (splats.Count > 14) splats.RemoveRange(0, splats.Count - 14);
+    }
+
+    float speedT;
+    int speedSeed;
+
+    /// <summary>Speed lines rushing in from the edges (dash, perfect dodge).</summary>
+    public void Speed(float seconds = 0.22f) { speedT = seconds; speedSeed = fxRng.RandiRange(1, 99999); }
+
+    void DrawScreenFx(Vector2 size, Player p)
+    {
+        // low health: a dark red vignette breathing in from the edges
+        if (p.Alive && p.Hp < p.MaxHp * 0.3f)
+        {
+            float low = 1f - p.Hp / (p.MaxHp * 0.3f);
+            float a = (0.35f + 0.35f * low) * (0.75f + 0.25f * Mathf.Sin(Time.GetTicksMsec() / 160f));
+            float d = 120f + 90f * low;
+            var edge = new Color(0.45f, 0f, 0.03f, a);
+            var clear = new Color(0.45f, 0f, 0.03f, 0f);
+            Vector2 tl = Vector2.Zero, tr = new(size.X, 0), br = size, bl = new(0, size.Y);
+            Vector2 itl = new(d, d), itr = new(size.X - d, d), ibr = size - new Vector2(d, d), ibl = new(d, size.Y - d);
+            DrawPolygon([tl, tr, itr, itl], [edge, edge, clear, clear]);
+            DrawPolygon([tr, br, ibr, itr], [edge, edge, clear, clear]);
+            DrawPolygon([br, bl, ibl, ibr], [edge, edge, clear, clear]);
+            DrawPolygon([bl, tl, itl, ibl], [edge, edge, clear, clear]);
+        }
+
+        foreach (var s in splats)
+        {
+            float a = Mathf.Clamp(s.Life / 0.8f, 0f, 1f) * 0.9f;
+            var col = new Color(Ink.Line, a);
+            Ink.Fill(this, Ink.Blob(s.Pos, s.R, s.R * 0.75f, s.Rot, s.Seed, 0.22f, 22), col, s.Seed);
+            for (int k = 0; k < 5; k++)
+            {
+                var dir = Vector2.FromAngle(s.Rot + k * 1.3f);
+                float r = 3f + 6f * Ink.Hash(s.Seed, k) * Ink.Hash(s.Seed, k);
+                DrawCircle(s.Pos + dir * s.R * (1.15f + 0.5f * Mathf.Abs(Ink.Hash(s.Seed + 1, k))), Mathf.Abs(r) + 2f, col);
+            }
+        }
+
+        if (speedT > 0)
+        {
+            float k = speedT / 0.22f;
+            var c = size / 2;
+            var col = new Color(Ink.Line, 0.6f * Mathf.Min(k, 1f));
+            for (int i = 0; i < 26; i++)
+            {
+                float ang = (i + 0.5f * Ink.Hash(speedSeed, i)) * Mathf.Tau / 26f;
+                var dir = Vector2.FromAngle(ang);
+                // from just past the screen's border (along this direction) a wedge pointing inward
+                float reach = Mathf.Min(Mathf.Abs(dir.X) > 1e-3f ? c.X / Mathf.Abs(dir.X) : 1e9f, Mathf.Abs(dir.Y) > 1e-3f ? c.Y / Mathf.Abs(dir.Y) : 1e9f) + 10f;
+                var outer = c + dir * reach;
+                float len = reach * (0.2f + 0.15f * Mathf.Abs(Ink.Hash(speedSeed + 3, i))) * (1.3f - Mathf.Min(k, 1f) * 0.3f);
+                var inner = outer - dir * len;
+                var side = dir.Orthogonal() * (3f + 3f * Mathf.Abs(Ink.Hash(speedSeed + 5, i)));
+                DrawColoredPolygon([outer + side, outer - side, inner], col);
+            }
+        }
     }
 
     public void Show(string text, string subtitle = "", float seconds = 2.2f)
@@ -70,7 +183,7 @@ public partial class Hud : Control
     /// <summary>A white-ish flash over the whole screen for big impacts.</summary>
     public void Flash(Color c, float seconds) { flashCol = c; flashT = flashLen = seconds; }
 
-    public void Hurt() => hurtT = 0.35f;
+    public void Hurt() { hurtT = 0.35f; SplatEdges(fxRng.RandiRange(2, 4)); }
     public void Perfect() => perfectT = 0.8f;
 
     public override void _Process(double delta)
@@ -81,6 +194,15 @@ public partial class Hud : Control
         perfectT = Mathf.Max(0, perfectT - dt);
         splashT = Mathf.Max(0, splashT - dt);
         flashT = Mathf.Max(0, flashT - dt);
+        speedT = Mathf.Max(0, speedT - dt);
+        impactT = Mathf.Max(0, impactT - (float)delta);
+        impactRect.Visible = impactT > 0;
+        for (int i = splats.Count - 1; i >= 0; i--)
+        {
+            var s = splats[i];
+            s.Life -= dt;
+            if (s.Life <= 0) splats.RemoveAt(i); else splats[i] = s;
+        }
         shownHp = Mathf.Lerp(shownHp, main.World.Player.Hp, 1 - Mathf.Exp(-6 * dt));
         QueueRedraw();
     }
@@ -113,11 +235,7 @@ public partial class Hud : Control
 
         if (w.SlowMo > 0) DrawRect(new Rect2(Vector2.Zero, size), new Color(0.2f, 0.5f, 1f, 0.06f));
         if (hurtT > 0) DrawRect(new Rect2(Vector2.Zero, size), new Color(0.8f, 0.05f, 0.05f, hurtT * 0.45f));
-        if (p.Hp < 30 && p.Alive)
-        {
-            float pulse = 0.12f + 0.08f * Mathf.Sin(Time.GetTicksMsec() / 150f);
-            DrawRect(new Rect2(Vector2.Zero, size), new Color(0.6f, 0f, 0.05f, pulse), false, 40f);
-        }
+        DrawScreenFx(size, p);
 
         // health, with the spin's recoverable part striped
         var hpRect = new Rect2(26, 22, 300, 16);

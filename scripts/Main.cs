@@ -142,9 +142,17 @@ public partial class Main : Node2D
         float s = trauma * trauma * 22f;
         var view = GetViewportRect().Size;
         float zoom = Mathf.Min(view.X / ViewW, view.Y / ViewH);
+        float lean = 0f;
+        if (killCamUntil != 0)
+        {
+            ulong now = Time.GetTicksMsec();
+            if (now >= killCamUntil) { killCamUntil = 0; Engine.TimeScale = 1.0; }
+            else lean = Mathf.Sin(Mathf.Pi * (1f - (killCamUntil - now) / (float)KillCamMs));
+        }
+        zoom *= 1f + 0.12f * lean;
         Camera.Zoom = new Vector2(zoom, zoom);
         kick = kick.Lerp(Vector2.Zero, 1f - Mathf.Exp(-14f * dt));
-        Camera.Offset = new Vector2(rng.RandfRange(-s, s), rng.RandfRange(-s, s)) + kick;
+        Camera.Offset = new Vector2(rng.RandfRange(-s, s), rng.RandfRange(-s, s)) + kick + (lastKill - Camera.Position) * 0.35f * lean;
     }
 
     public Weather WeatherFx { get; private set; } = null!;
@@ -192,6 +200,23 @@ public partial class Main : Node2D
 
     void Shake(float amount) => trauma = Mathf.Min(1f, trauma + amount * Settings.Shake);
 
+    static readonly Color CritCol = new(0.78f, 0.07f, 0.05f);
+    bool critNext;
+    Vector2 lastKill;
+    ulong killCamUntil;
+    const ulong KillCamMs = 550;
+
+    /// <summary>The last blow of a room: time slows to a crawl for half a second and the camera leans in on it.</summary>
+    void KillCam()
+    {
+        Engine.TimeScale = 0.25;
+        killCamUntil = Time.GetTicksMsec() + KillCamMs;
+    }
+
+    public bool KillCamOn => killCamUntil != 0;
+
+    public override void _ExitTree() => Engine.TimeScale = 1.0; // never leave the next scene in slow motion
+
     void Kick(float angle, float amount) => kick += Vector2.FromAngle(angle) * amount * Settings.Shake;
 
     /// <summary>The pause menu, over a frozen game (Esc).</summary>
@@ -199,6 +224,7 @@ public partial class Main : Node2D
 
     public void OpenPause()
     {
+        killCamUntil = 0; Engine.TimeScale = 1.0; // the pause menu must not run in slow motion
         var layer = new CanvasLayer { Layer = 10, ProcessMode = ProcessModeEnum.Always };
         layer.AddChild(Pause = new Menu { Paused = true });
         layer.TreeExited += () => Pause = null;
@@ -206,7 +232,7 @@ public partial class Main : Node2D
         GetTree().Paused = true;
     }
 
-    void React(GameEvent ev)
+    public void React(GameEvent ev)
     {
         EventCounts[ev.Kind] = EventCounts.GetValueOrDefault(ev.Kind) + 1;
         var pos = G(ev.Pos);
@@ -228,15 +254,30 @@ public partial class Main : Node2D
                 }
                 else SwingSound(p.Weapon.Kind, ev.I == p.Weapon.Light.Length - 1);
                 break;
+            case Ev.Crit:
+                critNext = true;
+                break;
             case Ev.Hit:
             {
                 bool heavy = ev.I == 1;
+                bool crit = critNext;
+                critNext = false;
                 float a = (pos - G(p.Pos)).Angle();
                 // the event carries the kind: a killing blow's target is already gone from World.Enemies
                 EKind? struck = ev.K >= 0 ? (EKind)ev.K : null;
                 HitSound(struck, heavy);
                 Fx.Sparks(pos, a, 0.7f, heavy ? HeavyCol : Ink.Line, heavy ? 14 : 8, heavy ? 700 : 520);
-                Fx.Number(pos, ((int)ev.A).ToString(), heavy ? HeavyCol : Ink.Line, heavy ? 30 : 22);
+                if (crit)
+                {
+                    // a critical cut: a big red number under 会心, a ring of steel, more shake, a burst of ink
+                    Fx.Number(pos, ((int)ev.A).ToString(), CritCol, heavy ? 46 : 38, "会心");
+                    Sfx.Play("deflect", -4f, 1.7f);
+                    Fx.Ring(pos, 10f, 70f, 0.22f, CritCol, 5f);
+                    Stains.Drops(pos, CritCol, a, 5);
+                    Shake(0.25f);
+                    if (heavy) Hud.Impact();
+                }
+                else Fx.Number(pos, ((int)ev.A).ToString(), heavy ? HeavyCol : Ink.Line, heavy ? 30 : 22);
                 Stains.Drops(pos, struck is { } sk ? KindColor(sk) : Ink.Line, a, heavy ? 6 : 3);
                 Shake(heavy ? 0.32f : 0.14f);
                 Kick(a, heavy ? 16f : 6f);
@@ -247,6 +288,7 @@ public partial class Main : Node2D
             {
                 var kind = (EKind)ev.I;
                 var col = KindColor(kind);
+                lastKill = pos;
                 bool boss = kind == EKind.Monolith;
                 Fx.Shards(pos, col, boss ? 80 : 18, boss ? 900 : 520, ev.A * 0.45f);
                 Fx.Ring(pos, ev.A, ev.A * 4f, 0.45f, new Color(Ink.Line, 0.6f), 4f);
@@ -258,6 +300,7 @@ public partial class Main : Node2D
                 break;
             }
             case Ev.Dash:
+                Hud.Speed();
                 Sfx.Play("dash", -4f, 1.15f);
                 Fx.Puff(pos, new Color(0.55f, 0.48f, 0.4f, 0.5f), 0.35f, 3);
                 break;
@@ -284,6 +327,7 @@ public partial class Main : Node2D
                 Sfx.Play("perfect", 2f, 1f, 0f);
                 Fx.Ring(pos, 20, Tune.PerfectMarkRadius, 0.5f, MagicCol, 6f);
                 Hud.Perfect();
+                Hud.Speed();
                 Shake(0.2f);
                 break;
             case Ev.PlayerHurt:
@@ -343,7 +387,9 @@ public partial class Main : Node2D
                 break;
             case Ev.GuardBreak:
                 Sfx.Play("guard_break", 0f, ev.A > 30f ? 0.8f : 1f);
-                Fx.Number(pos + new Vector2(0, -ev.A - 10f), "QUEBROU!", HeavyCol, 24);
+                // 破 (break) slammed onto the arena over the stunned one, sized to it
+                Fx.Stamp(pos + new Vector2(0, -ev.A - 30f), "破", 64f + ev.A * 1.4f, CritCol);
+                if (ev.A > 30f || World.Enemies.Count <= 6) Hud.Impact();
                 Fx.Ring(pos, ev.A, ev.A * 2.2f, 0.25f, new Color(0.95f, 0.8f, 0.3f), 5f);
                 Shake(0.3f);
                 Kick((pos - G(p.Pos)).Angle(), 10f);
@@ -427,6 +473,7 @@ public partial class Main : Node2D
             case Ev.GatesOpen:
                 Sfx.Play("victory", -8f, 1.3f, 0f);
                 Sfx.Play("heavy_hit", -2f, 0.6f);
+                KillCam();
                 Hud.Splash("開門", "PORTÕES ABERTOS", $"+{(int)ev.A} de vida · corte uma oferenda e siga", new Color(0.85f, 0.65f, 0.15f), 1.8f);
                 Hud.Flash(new Color(1f, 0.95f, 0.8f), 0.25f);
                 Shake(0.8f);
@@ -462,6 +509,8 @@ public partial class Main : Node2D
                 break;
             }
             case Ev.Victory:
+                KillCam();
+                Hud.Impact();
                 Sfx.Music("calm");
                 Sfx.Play("victory", 0f, 1f, 0f);
                 Hud.Show("VITÓRIA", $"maior combo: {World.BestCombo} hits · R para jogar de novo", 999f);

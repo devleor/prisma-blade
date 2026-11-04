@@ -114,6 +114,9 @@ public static class Relics
 
     public const int CoracaoHp = 20, BurnFrames = 120, BurnTick = 30, BurnDamage = 4, SedeHeal = 4, EspinhosDamage = 25;
     public const float AfiacaoMul = 0.10f, PeLeveMul = 0.65f, PeLeveFloor = 0.4f, FocoMul = 0.5f;
+    /// <summary>Critical cut: a small base chance; the big chance is meant to come from cards, so crit becomes a build.</summary>
+    public const float CritChance = 0.05f, CritMul = 1.8f;
+    public const int CritHitstop = 3;
 }
 
 public enum OfferKind { Weapon, Relic, Heal }
