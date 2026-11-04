@@ -21,7 +21,13 @@ public partial class Sfx : Node
 
     static readonly (string name, string[] files)[] Sounds =
     [
-        ("swing", ["swing1", "swing2", "swing3"]),
+        ("swing", ["swing1", "swing2", "swing3", "swing4"]),
+        ("clash", ["clash"]),
+        ("deflect", ["deflect"]),
+        ("chop", ["chop"]),
+        ("stone", ["stone1", "stone2"]),
+        ("guard_break", ["guard_break"]),
+        ("wall", ["wall"]),
         ("heavy_swing", ["heavy_swing"]),
         ("charge", ["charge"]),
         ("hit", ["hit1", "hit2", "hit3"]),

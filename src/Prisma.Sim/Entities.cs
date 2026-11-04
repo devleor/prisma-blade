@@ -158,6 +158,8 @@ public enum Ev
     RoomEnter, Guardian, GatesOpen, Portal, NextFloor,
     /// <summary>Stomp: a big one's footfall (A = its radius). Hatch: the Brood laid an egg sac (I = how many spiderlings).</summary>
     Stomp, Hatch,
+    /// <summary>GuardBreak: a hit broke an enemy's guard (poise), so it is stunned (I = kind).</summary>
+    GuardBreak,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>

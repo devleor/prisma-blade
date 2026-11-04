@@ -113,4 +113,19 @@ public class FloorTests
         Assert.Equal(EState.Stun, After(Weapon.Of(WKind.Martelo)));
         Assert.NotEqual(EState.Stun, After(Weapon.Longa));
     }
+
+    [Fact]
+    public void Breaking_a_guard_is_announced_once_with_the_kind_so_it_can_be_heard()
+    {
+        var w = Arena();
+        w.Player.Weapon = Weapon.Of(WKind.Martelo);
+        var golem = Dummy(w, EKind.Bastion, Up * 70f);
+        var seen = new List<GameEvent>();
+        w.Step(new Inputs { Light = true, Aim = Up }); seen.AddRange(w.Events);
+        for (int i = 0; i < 30; i++) { w.Step(new Inputs { Aim = Up }); seen.AddRange(w.Events); }
+        var breaks = seen.Where(e => e.Kind == Ev.GuardBreak).ToList();
+        Assert.Single(breaks);
+        Assert.Equal((int)EKind.Bastion, breaks[0].I);
+        Assert.Equal(EState.Stun, golem.State);
+    }
 }

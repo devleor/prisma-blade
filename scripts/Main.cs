@@ -141,6 +141,44 @@ public partial class Main : Node2D
     /// <summary>A small shake from outside the fight (thunder).</summary>
     public void Rumble(float amount) => Shake(amount);
 
+    /// <summary>Each sword has its own voice: daggers whip high, the spear hisses short, heavy blades groan low,
+    /// the katana rings; the last cut of a chain is lower and louder.</summary>
+    void SwingSound(WKind kind, bool finisher)
+    {
+        float pitch = kind switch
+        {
+            WKind.Adagas => 1.4f, WKind.Katana => 1.2f, WKind.Lanca => 1.3f, WKind.Runica => 1.0f,
+            WKind.Montante => 0.68f, WKind.Martelo => 0.6f, WKind.Foice => 0.85f, _ => 1.05f,
+        };
+        if (finisher) pitch *= 0.82f;
+        Sfx.Play("swing", finisher ? 0f : -2f, pitch);
+        switch (kind)
+        {
+            case WKind.Montante or WKind.Martelo: Sfx.Play("heavy_swing", -6f, pitch * 0.8f); break;
+            case WKind.Katana: Sfx.Play("deflect", -16f, 1.9f, 0.03f); break; // a thin ring of steel
+            case WKind.Runica: Sfx.Play("perfect", -18f, 1.6f, 0.05f); break; // the runes hum
+        }
+    }
+
+    /// <summary>What the blade bit into: stone thuds, metal clangs, flesh chops.</summary>
+    void HitSound(EKind? kind, bool heavy)
+    {
+        switch (kind)
+        {
+            case EKind.Bastion or EKind.Monolith:
+                Sfx.Play("stone", heavy ? 2f : -2f, heavy ? 0.85f : 1.05f);
+                break;
+            case EKind.Shield:
+                Sfx.Play("clash", heavy ? -2f : -5f, heavy ? 0.95f : 1.2f);
+                break;
+            default:
+                Sfx.Play("chop", heavy ? 0f : -3f, heavy ? 0.85f : 1.1f);
+                Sfx.Play("hit", -8f, 1.2f);
+                break;
+        }
+        if (heavy) Sfx.Play("heavy_hit", -1f, 0.9f);
+    }
+
     void Shake(float amount) => trauma = Mathf.Min(1f, trauma + amount * Settings.Shake);
 
     void Kick(float angle, float amount) => kick += Vector2.FromAngle(angle) * amount * Settings.Shake;
@@ -171,22 +209,23 @@ public partial class Main : Node2D
                     Fx.Ring(pos, 30, Moves.Spin.Reach, 0.25f, new Color(Ink.Line, 0.7f), 5f);
                     Shake(0.15f);
                 }
-                else if (ev.I == Moves.HeavyIndex) { Sfx.Play("heavy_swing", 2f, p.Weapon.Kind == WKind.Montante ? 0.45f : 0.6f); Shake(0.12f); }
-                else
+                else if (ev.I == Moves.HeavyIndex)
                 {
-                    float pitch = p.Weapon.Kind switch { WKind.Adagas => 1.35f, WKind.Montante => 0.7f, WKind.Katana => 1.2f, _ => 1.05f };
-                    Sfx.Play("swing", -2f, ev.I == p.Weapon.Light.Length - 1 ? pitch * 0.8f : pitch);
+                    Sfx.Play("heavy_swing", 2f, p.Weapon.Kind is WKind.Montante or WKind.Martelo ? 0.45f : 0.6f);
+                    Sfx.Play("swing", -4f, 0.8f);
+                    Shake(0.12f);
                 }
+                else SwingSound(p.Weapon.Kind, ev.I == p.Weapon.Light.Length - 1);
                 break;
             case Ev.Hit:
             {
                 bool heavy = ev.I == 1;
-                Sfx.Play(heavy ? "heavy_hit" : "hit", heavy ? 1f : -3f, heavy ? 0.9f : 1.1f);
                 float a = (pos - G(p.Pos)).Angle();
+                var struck = World.Enemies.OrderBy(e => (G(e.Pos) - pos).LengthSquared()).FirstOrDefault();
+                HitSound(struck?.Kind, heavy);
                 Fx.Sparks(pos, a, 0.7f, heavy ? HeavyCol : Ink.Line, heavy ? 14 : 8, heavy ? 700 : 520);
                 Fx.Number(pos, ((int)ev.A).ToString(), heavy ? HeavyCol : Ink.Line, heavy ? 30 : 22);
-                var hit = World.Enemies.Where(e => e.Alive).OrderBy(e => (G(e.Pos) - pos).LengthSquared()).FirstOrDefault();
-                Stains.Drops(pos, hit != null ? KindColor(hit.Kind) : Ink.Line, a, heavy ? 6 : 3);
+                Stains.Drops(pos, struck != null ? KindColor(struck.Kind) : Ink.Line, a, heavy ? 6 : 3);
                 Shake(heavy ? 0.32f : 0.14f);
                 Kick(a, heavy ? 16f : 6f);
                 if (heavy && p.HeavySwing && p.Weapon.FullCharge(p.Charge)) Hud.Flash(new Color(1f, 0.9f, 0.7f), 0.12f);
@@ -213,7 +252,8 @@ public partial class Main : Node2D
             case Ev.WallHit:
             {
                 bool charge = ev.I == 1;
-                Sfx.Play("heavy_hit", charge ? 3f : 0f, charge ? 0.55f : 0.75f);
+                Sfx.Play("wall", charge ? 2f : -2f, charge ? 0.85f : 1f);
+                if (charge) Sfx.Play("heavy_hit", -2f, 0.55f);
                 Fx.Puff(pos, new Color(0.55f, 0.5f, 0.42f, 0.75f), charge ? 0.8f : 0.5f, charge ? 6 : 4);
                 Fx.Shards(pos, new Color(0.55f, 0.5f, 0.42f), charge ? 16 : 8, 380, 6f);
                 Stains.Drops(pos, Ink.Line, 0, charge ? 5 : 2);
@@ -245,13 +285,13 @@ public partial class Main : Node2D
                 Sfx.Play("enemy_shoot", ev.A > 0 ? -2f : -8f, ev.A > 0 ? 0.7f : 1f);
                 break;
             case Ev.Deflect:
-                Sfx.Play("hit", -2f, 1.6f);
+                Sfx.Play("deflect", -1f, 1.1f);
                 Fx.Sparks(pos, (pos - G(p.Pos)).Angle(), 0.5f, Ink.Line, 10, 600);
                 Fx.Number(pos, "REBATIDO", Ink.Line, 16);
                 break;
             case Ev.Block:
-                Sfx.Play("hit", -1f, 1.9f);
-                Sfx.Play("heavy_hit", -9f, 1.6f);
+                Sfx.Play("clash", -2f, 1.15f);
+                Sfx.Play("deflect", -10f, 1.4f);
                 Fx.Sparks(pos, (pos - G(p.Pos)).Angle() + Mathf.Pi, 0.9f, new Color(1f, 0.9f, 0.6f), 10, 500);
                 Fx.Number(pos, "BLOQUEOU", new Color(0.45f, 0.42f, 0.4f), 18);
                 Shake(0.1f);
@@ -288,6 +328,13 @@ public partial class Main : Node2D
                 break;
             case Ev.Telegraph:
                 if ((EKind)ev.I == EKind.Monolith) Sfx.Play("charge", -6f, 0.55f, 0f);
+                break;
+            case Ev.GuardBreak:
+                Sfx.Play("guard_break", 0f, ev.A > 30f ? 0.8f : 1f);
+                Fx.Number(pos + new Vector2(0, -ev.A - 10f), "QUEBROU!", HeavyCol, 24);
+                Fx.Ring(pos, ev.A, ev.A * 2.2f, 0.25f, new Color(0.95f, 0.8f, 0.3f), 5f);
+                Shake(0.3f);
+                Kick((pos - G(p.Pos)).Angle(), 10f);
                 break;
             case Ev.Stomp:
             {

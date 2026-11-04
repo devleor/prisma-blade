@@ -26,6 +26,18 @@ Kenney packs: https://kenney.nl/assets/<slug> - author Kenney (www.kenney.nl) - 
 | enemy_shoot.ogg | laserSmall_000.ogg | Sci-fi Sounds | https://kenney.nl/assets/sci-fi-sounds | Kenney | CC0 |
 | victory.ogg | Steel jingles/jingles_STEEL07.ogg | Music Jingles | https://kenney.nl/assets/music-jingles | Kenney | CC0 |
 | defeat.ogg | Sax jingles/jingles_SAX07.ogg | Music Jingles | https://kenney.nl/assets/music-jingles | Kenney | CC0 |
+| swing4.ogg | swish-9.wav (via Ecos da Fenda `whoosh_1.ogg`) | Swishes Sound Pack | https://opengameart.org/content/swishes-sound-pack | artisticdude | CC0 |
+| clash.ogg | metalPot2.ogg (via Ecos `clash.ogg`) | 50 RPG Sound Effects | https://opengameart.org/content/50-rpg-sound-effects | Kenney | CC0 |
+| chop.ogg | chop.ogg (via Ecos `hit_light_1.ogg`) | 50 RPG Sound Effects | same | Kenney | CC0 |
+| deflect.ogg | metal_01.ogg (via Ecos `deflect.ogg`) | 80 CC0 RPG SFX | https://opengameart.org/content/80-cc0-rpg-sfx | rubberduck | CC0 |
+| stone1.ogg | stones_04.ogg, pitch -15% (via Ecos `hit_heavy_1.ogg`) | 80 CC0 RPG SFX | same | rubberduck | CC0 |
+| stone2.ogg | item_stone_01.ogg, pitch -10% (via Ecos `hit_heavy_2.ogg`) | 80 CC0 RPG SFX | same | rubberduck | CC0 |
+| guard_break.ogg | stones_03.ogg (via Ecos `posture_break.ogg`) | 80 CC0 RPG SFX | same | rubberduck | CC0 |
+| wall.ogg | bfh1_hit_07 + bfh1_hit_02 (via Ecos `wall_bounce.ogg`) | 75 CC0 Breaking/Falling/Hit SFX | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | rubberduck | CC0 |
+
+Copied from `ecos-da-fenda/assets/audio/sfx` on 2026-11-03 (sources and licences recorded there in `docs/AUDIO_FONT_SOURCES.md`).
+
+The rain, drizzle, ash-wind and thunder ambience is **synthesized in code** (`scripts/Weather.cs`: filtered noise, droplet blips, a brown-noise rumble); no sample is used.
 
 ## Music (`assets/audio/music`)
 

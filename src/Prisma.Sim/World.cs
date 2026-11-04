@@ -342,7 +342,7 @@ public sealed partial class World
         {
             e.Poise -= poiseDmg;
             e.PoiseIdle = 0f;
-            if (e.Poise <= 0f) { e.Poise = e.MaxPoise; stun = e.Boss ? 80f : 55f; }
+            if (e.Poise <= 0f) { e.Poise = e.MaxPoise; stun = e.Boss ? 80f : 55f; Emit(Ev.GuardBreak, e.Pos, e.Radius, (int)e.Kind); }
             else armoured = true;
         }
         float scale = e.Boss ? 0.35f : 1f;

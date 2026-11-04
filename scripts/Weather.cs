@@ -30,6 +30,77 @@ public partial class Weather : Node2D
 
     public Weather(Main main) { this.main = main; ZIndex = 50; }
 
+    // ---------------------------------------------------------------- sound, synthesized (no sample, no licence)
+
+    const float MixRate = 22050f;
+    AudioStreamPlayer? ambience;
+    float lp1, lp2, brown, dropEnv, dropPhase, dropFreq, thunder, gust;
+    readonly System.Random noise = new(7);
+
+    /// <summary>Frames of ambience written so far (the checks read it).</summary>
+    public long Synthesized { get; private set; }
+
+    public override void _Ready()
+    {
+        AddChild(ambience = new AudioStreamPlayer
+        {
+            Stream = new AudioStreamGenerator { MixRate = MixRate, BufferLength = 0.25f },
+            Bus = Settings.SfxBus,
+            VolumeDb = -14f,
+        });
+    }
+
+    float Volume => Kind switch { Sky.Rain => 0.55f, Sky.Drizzle => 0.3f, Sky.Ash => 0.35f, _ => 0f };
+
+    /// <summary>
+    /// Rain: white noise through two low-pass stages (the hiss) plus random droplets (short decaying blips at random
+    /// pitch); a thunder rumble (brown noise, slow decay) follows each lightning. Ash caves: a low wind that gusts.
+    /// </summary>
+    void Synth()
+    {
+        if (ambience == null) return;
+        if (Volume <= 0f) { if (ambience.Playing) ambience.Stop(); return; }
+        if (!ambience.Playing) ambience.Play();
+        if (ambience.GetStreamPlayback() is not AudioStreamGeneratorPlayback pb) return;
+        int n = pb.GetFramesAvailable();
+        float vol = Volume;
+        bool rain = Kind is Sky.Rain or Sky.Drizzle;
+        float dropRate = Kind == Sky.Rain ? 0.0035f : 0.0012f;
+        for (int i = 0; i < n; i++)
+        {
+            float w = (float)(noise.NextDouble() * 2.0 - 1.0);
+            float s;
+            if (rain)
+            {
+                lp1 += (w - lp1) * 0.35f;
+                lp2 += (lp1 - lp2) * 0.5f;
+                s = lp2 * 0.6f;
+                if (dropEnv < 0.01f && noise.NextDouble() < dropRate) { dropEnv = 0.4f + 0.6f * (float)noise.NextDouble(); dropFreq = 900f + 2600f * (float)noise.NextDouble(); }
+                if (dropEnv > 0.001f)
+                {
+                    dropPhase += dropFreq / MixRate;
+                    s += Mathf.Sin(dropPhase * Mathf.Tau) * dropEnv * 0.25f;
+                    dropEnv *= 0.993f;
+                }
+            }
+            else
+            {
+                brown = Mathf.Clamp(brown + w * 0.02f, -1f, 1f);
+                gust += ((0.5f + 0.5f * Mathf.Sin(t * 0.7f + i / MixRate)) - gust) * 0.0005f;
+                s = brown * (0.4f + 0.6f * gust);
+            }
+            if (thunder > 0.001f)
+            {
+                brown = Mathf.Clamp(brown + w * 0.03f, -1f, 1f);
+                s += brown * thunder * 1.4f;
+                thunder *= 0.99993f;
+            }
+            s = Mathf.Clamp(s * vol, -1f, 1f);
+            pb.PushFrame(new Vector2(s, s));
+        }
+        Synthesized += n;
+    }
+
     public static Sky Of(Biome b) => b switch
     {
         Biome.Floresta => Sky.Rain,
@@ -84,6 +155,7 @@ public partial class Weather : Node2D
 
     public override void _Process(double delta)
     {
+        Synth();
         if (Kind == Sky.None) return;
         float dt = (float)delta;
         t += dt;
@@ -125,6 +197,7 @@ public partial class Weather : Node2D
             Flashes++;
             main.Hud?.Flash(new Color(0.85f, 0.9f, 1f), 0.18f);
             main.Rumble(0.12f);
+            thunder = 1f; // the rumble follows the flash
         }
         QueueRedraw();
     }

@@ -77,6 +77,8 @@ public partial class GameCheck : Node
                 break;
             case 185:
                 Check(main.WeatherFx.Splashes > 0, "raindrops land as little rings on the floor");
+                Check(main.WeatherFx.Synthesized > 0, $"the rain is heard: its hiss is synthesized ({main.WeatherFx.Synthesized} frames)");
+                Check(main.Sfx.Loaded >= 26, $"the new sword sounds load ({main.Sfx.Loaded})");
                 main.WeatherFx.Set(Weather.Of(Biome.Cinzas));
                 Check(main.WeatherFx.Kind == Sky.Ash, "the ash caves have falling ash");
                 main.WeatherFx.Set(Sky.None);
