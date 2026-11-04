@@ -5,7 +5,7 @@ config_version=5
 
 config/name="Prisma Blade"
 config/description="Hack-and-slash top-down: um quadrado, uma espada pesada, formas geometricas estilhacadas."
-run/main_scene="res://scenes/Main.tscn"
+run/main_scene="res://scenes/Menu.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 
 [display]

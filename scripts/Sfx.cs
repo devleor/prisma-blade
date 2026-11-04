@@ -39,14 +39,15 @@ public partial class Sfx : Node
 
     public override void _Ready()
     {
+        Settings.Load(); // makes the Music and SFX buses
         foreach (var (name, files) in Sounds)
         {
             var streams = files.Select(f => Find("res://assets/audio/sfx/" + f)).OfType<AudioStream>().ToArray();
             Loaded += streams.Length;
             lib[name] = streams;
         }
-        for (int i = 0; i < pool.Length; i++) AddChild(pool[i] = new AudioStreamPlayer());
-        AddChild(music = new AudioStreamPlayer { VolumeDb = -9f });
+        for (int i = 0; i < pool.Length; i++) AddChild(pool[i] = new AudioStreamPlayer { Bus = Settings.SfxBus });
+        AddChild(music = new AudioStreamPlayer { VolumeDb = -9f, Bus = Settings.MusicBus });
         music.Finished += () => music.Play(); // loop whatever the format, wav included
     }
 

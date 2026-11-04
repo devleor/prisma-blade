@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 using Prisma.Sim;
 using V = System.Numerics.Vector2;
 
@@ -14,7 +14,8 @@ public partial class Snapshot : Node
 {
     int frame;
     Main main = null!;
-    static readonly int[] Shots = [200, 330, 420, 520];
+    static readonly int[] Shots = [200, 330, 420, 520, 600, 680];
+    Menu? menu;
 
     public override void _Ready()
     {
@@ -30,6 +31,11 @@ public partial class Snapshot : Node
     public override void _PhysicsProcess(double delta)
     {
         frame++;
+        if (frame == 530) { main.QueueFree(); AddChild(menu = new Menu { Live = false }); }
+        if (frame == 570) menu!.Move(1);
+        if (frame == 610) menu!.Confirm();
+        if (frame == 640) menu!.Move(3);
+        if (frame >= 530) { Shoot(); return; }
         var w = main.World;
         var p = w.Player;
         if (frame < 340)
@@ -77,6 +83,11 @@ public partial class Snapshot : Node
         }
         if (frame > 430 && frame < 520 && frame % 25 == 0) { Input.ActionPress(Controls.Light); }
         else if (frame > 430) Input.ActionRelease(Controls.Light);
+        Shoot();
+    }
+
+    void Shoot()
+    {
         if (Array.IndexOf(Shots, frame) >= 0)
         {
             var path = ProjectSettings.GlobalizePath($"res://test-results/snapshot_{frame}.png");

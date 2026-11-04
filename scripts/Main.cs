@@ -45,6 +45,8 @@ public partial class Main : Node2D
     public override void _Ready()
     {
         Controls.Register();
+        Settings.Load();
+        ProcessMode = ProcessModeEnum.Pausable; // freezes under the pause menu, whoever its parent is
         World = new World((uint)Time.GetTicksUsec() | 1u, waves: !Peaceful);
 
         // the whole arena on screen, centred and still, like a page; zoom is fitted to the window each frame
@@ -73,6 +75,12 @@ public partial class Main : Node2D
         AddChild(Sfx = new Sfx());
         Sfx.Music("battle");
         if (!Peaceful) Hud.Show("PRISMA BLADE", "escolha uma porta · mate o guardião para abrir os portões", 3.5f);
+    }
+
+    /// <summary>Esc opens the pause menu; the Esc that closes it is consumed by the menu, so it cannot reopen it.</summary>
+    public override void _UnhandledInput(InputEvent e)
+    {
+        if (e.IsActionPressed("ui_cancel") && !Peaceful && Pause == null) { OpenPause(); GetViewport().SetInputAsHandled(); }
     }
 
     public override void _Input(InputEvent e)
@@ -126,9 +134,21 @@ public partial class Main : Node2D
         Camera.Offset = new Vector2(rng.RandfRange(-s, s), rng.RandfRange(-s, s)) + kick;
     }
 
-    void Shake(float amount) => trauma = Mathf.Min(1f, trauma + amount);
+    void Shake(float amount) => trauma = Mathf.Min(1f, trauma + amount * Settings.Shake);
 
-    void Kick(float angle, float amount) => kick += Vector2.FromAngle(angle) * amount;
+    void Kick(float angle, float amount) => kick += Vector2.FromAngle(angle) * amount * Settings.Shake;
+
+    /// <summary>The pause menu, over a frozen game (Esc).</summary>
+    public Menu? Pause { get; private set; }
+
+    public void OpenPause()
+    {
+        var layer = new CanvasLayer { Layer = 10, ProcessMode = ProcessModeEnum.Always };
+        layer.AddChild(Pause = new Menu { Paused = true });
+        layer.TreeExited += () => Pause = null;
+        AddChild(layer);
+        GetTree().Paused = true;
+    }
 
     void React(GameEvent ev)
     {

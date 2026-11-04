@@ -80,6 +80,16 @@ hachura na sombra. Cada sala sorteia o chão pela semente dela.
 - O anúncio de rodada: uma pincelada vermelha cresce da esquerda para a direita em 0,18 s, gotas voam, o kanji
   bate na tela grande (2,6x) e assenta com um pequeno rebote, a câmera treme, e o nome é escrito embaixo.
 
+## Menu
+
+O menu (`scripts/Menu.cs`) é a mesma folha de caderno, sem tela de fundo do jogo:
+- O título 光刃 ("lâmina de luz") bate na tela grande e assenta com rebote, sobre uma pincelada vermelha que cresce.
+- O item escolhido ganha uma pincelada vermelha que varre da esquerda para a direita em 0,16 s, um sublinhado
+  rabiscado e uma espadinha a nanquim apontando para ele; a página dá um tranco a cada troca.
+- Confirmar joga gotas de tinta que caem e viram manchas que ficam no papel.
+- Configurações (設定): barras hachuradas com uma gota de tinta como botão. Mexer no tremor já treme a página
+  na força nova. Pausa (休止, Esc) é a mesma folha menor, sobre o jogo escurecido.
+
 ## Impacto
 
 Tremor de câmera aleatório (trauma ao quadrado), tranco direcional na direção do golpe, hitstop da simulação,

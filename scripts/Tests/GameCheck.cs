@@ -15,6 +15,9 @@ public partial class GameCheck : Node
     Main main = null!;
     float startX;
     Enemy? target;
+    Menu? menu;
+    long frozenAt;
+    float effectsBefore, shakeBefore;
 
     void Check(bool ok, string what)
     {
@@ -25,6 +28,8 @@ public partial class GameCheck : Node
     public override void _Ready()
     {
         Main.Peaceful = true;
+        Settings.Persist = false; // never touch the player's settings file
+        ProcessMode = ProcessModeEnum.Always; // keeps checking while the game is paused
         main = GD.Load<PackedScene>("res://scenes/Main.tscn").Instantiate<Main>();
         AddChild(main);
         main.AimOverride = new Vector2(0, -1);
@@ -86,6 +91,44 @@ public partial class GameCheck : Node
                 main.Hud.Round(1, "ONDA 1/2");
                 Check(main.Hud.SplashLeft > 0 && main.Hud.SplashLabel == "ONDA 1/2", "the round splash starts");
                 Check(Hud.Kanji.GetStringSize("第一波").X > 0 && Ink.Hand.GetStringSize("onda").X > 0, "the brush and handwriting fonts load");
+                main.OpenPause();
+                break;
+            case 264:
+                Check(GetTree().Paused && main.Pause != null, "the pause menu opens and freezes the game");
+                Check(main.Pause?.Items.FirstOrDefault() == "CONTINUAR", "it offers to continue");
+                frozenAt = main.World.Frame;
+                break;
+            case 274:
+                Check(main.World.Frame == frozenAt, "nothing moves while paused");
+                main.Pause!.Cancel(); // Esc in the pause menu goes back to the game
+                break;
+            case 277:
+                Check(!GetTree().Paused && main.Pause == null, "Esc closes the pause menu");
+                Check(main.World.Frame > frozenAt, "the game runs again");
+                AddChild(menu = new Menu { Live = false, Size = new Vector2(1280, 720) });
+                break;
+            case 279:
+                Check(menu!.Current == Menu.Page.Title && menu.Items[0] == "JOGAR", "the title menu starts on JOGAR");
+                menu.Move(1);
+                Check(menu.Selected == 1, "down moves the choice");
+                menu.Confirm();
+                Check(menu.Current == Menu.Page.Settings, "CONFIGURAÇÕES opens the settings page");
+                effectsBefore = Settings.Effects; shakeBefore = Settings.Shake;
+                menu.Move(2); menu.Adjust(-1); menu.Adjust(-1); menu.Adjust(-1);
+                Check(Mathf.IsEqualApprox(Settings.Effects, Mathf.Snapped(effectsBefore - 0.3f, 0.05f)), $"left lowers the effects volume ({effectsBefore} -> {Settings.Effects})");
+                Check(Mathf.IsEqualApprox(AudioServer.GetBusVolumeDb(AudioServer.GetBusIndex(Settings.SfxBus)), Mathf.LinearToDb(Settings.Effects)), "the effects bus follows it");
+                Check(main.Sfx.GetChildren().OfType<AudioStreamPlayer>().All(a => a.Bus == Settings.SfxBus || a.Bus == Settings.MusicBus), "every player sits on the music or effects bus");
+                menu.Move(1); menu.Adjust(-1); menu.Adjust(-1);
+                Check(Settings.Shake < shakeBefore, "screen shake can be turned down");
+                break;
+            case 330:
+                Check(menu!.StainCount > 0, $"choosing flicks ink that stays on the page ({menu.StainCount})");
+                menu.Cancel();
+                Check(menu.Current == Menu.Page.Title, "Esc goes back from settings");
+                Check(menu.Selected == 0, "back on the title page the choice is JOGAR again");
+                menu.Confirm();
+                Check(menu.LastAction == "play", "JOGAR starts the game");
+                Settings.Effects = effectsBefore; Settings.Shake = shakeBefore; Settings.Apply();
                 GD.Print(failures == 0 ? "PASSED" : $"FAILED ({failures})");
                 GetTree().Quit(failures == 0 ? 0 : 1);
                 break;
