@@ -55,6 +55,7 @@ public partial class GameCheck : Node
                 Check(target!.Hp < target.MaxHp, $"attack_light swings and hits the hexagon in front ({target.Hp}/{target.MaxHp})");
                 Check(main.EventCounts.GetValueOrDefault(Ev.Swing) == 1, "one swing event");
                 Check(main.Fx.Count > 0, "the hit spawns sparks / numbers");
+                Check(main.Stains.Count > 0, $"the hit flicks ink that stays on the floor ({main.Stains.Count} stains)");
                 Check(main.Sfx.Loaded >= 18, $"sound effects load from assets/audio ({main.Sfx.Loaded})");
                 Check(main.Sfx.Played >= 2, "swing and hit play sounds");
                 Check(main.Sfx.CurrentMusic == "battle", "battle music is selected");
@@ -82,6 +83,9 @@ public partial class GameCheck : Node
             case 262:
                 Check(main.EventCounts.GetValueOrDefault(Ev.Swing) == 3, "the special action spins");
                 Check(main.World.Player.Hp + main.World.Player.Recover == main.World.Player.MaxHp, "its cost is shown as recoverable health");
+                main.Hud.Round(1, "ONDA 1/2");
+                Check(main.Hud.SplashLeft > 0 && main.Hud.SplashLabel == "ONDA 1/2", "the round splash starts");
+                Check(Hud.Kanji.GetStringSize("第一波").X > 0 && Ink.Hand.GetStringSize("onda").X > 0, "the brush and handwriting fonts load");
                 GD.Print(failures == 0 ? "PASSED" : $"FAILED ({failures})");
                 GetTree().Quit(failures == 0 ? 0 : 1);
                 break;

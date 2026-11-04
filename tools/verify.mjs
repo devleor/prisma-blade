@@ -23,6 +23,6 @@ run('dotnet', ['build', 'PrismaBlade.csproj', '-warnaserror']);
 run('dotnet', ['test', 'PrismaBlade.sln', '--logger', 'junit;LogFilePath=TestResults/junit.xml']);
 if (!existsSync(godot)) { console.error('Godot not found: set GODOT to the path of the *_console.exe'); process.exit(1); }
 run(godot, ['--headless', '--path', '.', '--import'], {timeoutMin: 10});
-run(godot, ['--headless', '--path', '.', 'res://scenes/tests/GameCheck.tscn'], {timeoutMin: 5, mustPrint: 'PASSED'});
-if (process.argv.includes('--gpu')) run(godot, ['--path', '.', '--resolution', '1280x720', 'res://scenes/tests/Snapshot.tscn'], {timeoutMin: 3, mustPrint: 'saved'});
+run(godot, ['--headless', '--audio-driver', 'Dummy', '--path', '.', 'res://scenes/tests/GameCheck.tscn'], {timeoutMin: 5, mustPrint: 'PASSED'});
+if (process.argv.includes('--gpu')) run(godot, ['--path', '.', '--audio-driver', 'Dummy', '--resolution', '1280x720', 'res://scenes/tests/Snapshot.tscn'], {timeoutMin: 3, mustPrint: 'saved'});
 console.log('\nverification: ok');
