@@ -105,6 +105,7 @@ public partial class Main : Node2D
         else aim = Input.GetVector(Controls.AimLeft, Controls.AimRight, Controls.AimUp, Controls.AimDown);
 
         var before = G(p.Pos);
+        long simT = Prof.Begin();
         World.Step(new Inputs
         {
             Move = new V(move.X, move.Y),
@@ -115,18 +116,27 @@ public partial class Main : Node2D
             Shatter = Input.IsActionJustPressed(Controls.Shatter),
             Special = Input.IsActionJustPressed(Controls.Special),
         });
+        Prof.End("sim", simT);
         stride += (G(p.Pos) - before).Length();
+        long reactT = Prof.Begin();
         foreach (var ev in World.Events) React(ev);
+        Prof.End("react", reactT);
         if (World.Altars.Count > 0) lastOffers = [.. World.Altars.Select(a => a.Offer)];
 
         Ink.Boil = World.Frame / 6; // the ink lines are redrawn with a new wobble 10 times a second
+        long artT = Prof.Begin();
         StepArt();
-        QueueRedraw();
+        Prof.End("stepart", artT);
+        drawDirty = true;
     }
+
+    /// <summary>The sim may step several times in one rendered frame; the picture is redrawn once per frame.</summary>
+    bool drawDirty = true;
 
     public override void _Process(double delta)
     {
         float dt = (float)delta;
+        if (drawDirty) { drawDirty = false; QueueRedraw(); }
         AgeGhosts(dt);
         trauma = Mathf.Max(0, trauma - 1.8f * dt);
         float s = trauma * trauma * 22f;
@@ -371,6 +381,16 @@ public partial class Main : Node2D
             case Ev.Burn:
                 Fx.Number(pos, ((int)ev.A).ToString(), new Color(0.95f, 0.45f, 0.1f), 16);
                 break;
+            case Ev.SpawnMark:
+            {
+                // an inked ring closes in on the spot where it will step in, in the colour of what is coming
+                var col = KindColor((EKind)ev.I);
+                float secs = ev.A / 60f;
+                Fx.Ring(pos, 44f, 12f, secs, new Color(col, 0.85f), 3f);
+                Fx.Ring(pos, 30f, 8f, secs, new Color(Ink.Line, 0.6f), 1.5f);
+                Stains.Drops(pos, new Color(Ink.Line, 0.5f), rng.RandfRange(0, Mathf.Tau), 1);
+                break;
+            }
             case Ev.Heal:
                 Fx.Number(pos + new Vector2(0, -20), $"+{(int)ev.A}", new Color(0.3f, 0.6f, 0.25f), 20);
                 break;

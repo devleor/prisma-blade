@@ -329,7 +329,7 @@ public class CombatTests
         Assert.Empty(w.Projs);
         w.HurtPlayer(10, w.Player.Pos, null);
         Assert.Equal(Phase.Won, w.Phase);
-        Assert.Equal(5 + World.RoomClearHeal, w.Player.Hp);
+        Assert.Equal(5 + World.RoomClearHeal + Offer.HealAmount, w.Player.Hp); // the guardian drops the red potion
     }
 
     [Fact]
@@ -544,10 +544,14 @@ public class CombatTests
             room.Layout = seed % 2 == 0 ? 0 : 3; // layouts with pillars
             w.EnterRoom(room, Side.S);
             w.Player.Pos = w.Pillars[(int)(seed % (uint)w.Pillars.Count)].Pos + new Vector2(0f, 60f); // near stone, so the picker has to avoid it
-            for (int i = 0; i < 52; i++) w.Step(default);
-            Assert.NotEmpty(w.Enemies);
-            foreach (var e in w.Enemies)
-                Assert.False(w.InsidePillar(e.Pos, 50f), $"seed {seed}: spawned at {e.Pos}");
+            var checkedIds = new HashSet<int>();
+            for (int i = 0; i < 600 && (w.Wave < 0 || w.Incoming.Count > 0); i++) // they step in group by group: check each as it lands
+            {
+                w.Step(new Inputs());
+                foreach (var e in w.Enemies.Where(e => checkedIds.Add(e.Id)))
+                    Assert.False(w.InsidePillar(e.Pos, 50f), $"seed {seed}: spawned at {e.Pos}");
+            }
+            Assert.NotEmpty(checkedIds);
         }
     }
 

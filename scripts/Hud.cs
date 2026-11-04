@@ -99,6 +99,13 @@ public partial class Hud : Control
 
     public override void _Draw()
     {
+        long t = Prof.Begin();
+        DrawBody();
+        Prof.End("draw:hud", t);
+    }
+
+    void DrawBody()
+    {
         var w = main.World;
         var p = w.Player;
         var size = Size;

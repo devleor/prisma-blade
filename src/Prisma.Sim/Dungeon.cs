@@ -19,6 +19,8 @@ public sealed class RoomNode
     public bool Cleared, Seen;
     /// <summary>Offers raised here and not yet taken: they wait on their altars if you leave and come back.</summary>
     public Offer[]? Pending;
+    /// <summary>The wave (index) that is a horde of fragile small fry, or -1.</summary>
+    public int Horde = -1;
 }
 
 public static class Sides
@@ -137,14 +139,15 @@ public sealed class Dungeon(int floor)
                 case RoomKind.Elite:
                 {
                     int waves = 2 + (tier >= 5 ? 1 : 0);
-                    r.Waves = [.. Enumerable.Range(0, waves).Select(i => Wave(rng, tier, 2.5f + tier * 0.7f + i * 0.5f))];
+                    r.Waves = [.. Enumerable.Range(0, waves).Select(i => Wave(rng, tier, (2.5f + tier * 0.7f + i * 0.5f) * WaveBudget))];
+                    if (r.Kind == RoomKind.Fight && rng.Next() % 100 < HordeChance) { r.Horde = 1; r.Waves[1] = HordeWave(tier); }
                     var open = Leaders.Where(k => Pool.Any(p => p.Kind == k && p.From <= tier)).ToArray();
                     int n = r.Kind == RoomKind.Elite ? 2 : 1;
                     r.Guardians = [.. Enumerable.Range(0, n).Select(_ => open[(int)(rng.Next() % (uint)open.Length)])];
                     break;
                 }
                 case RoomKind.Boss:
-                    r.Waves = [Wave(rng, tier, 3f + tier * 0.6f)];
+                    r.Waves = [Wave(rng, tier, (3f + tier * 0.6f) * WaveBudget)];
                     r.Guardians = [EKind.Monolith];
                     break;
             }
@@ -152,11 +155,22 @@ public sealed class Dungeon(int floor)
         return d;
     }
 
+    /// <summary>Waves cost this much more than the first tuning: a hack-and-slash wants a crowd to cut through.</summary>
+    public const float WaveBudget = 1.8f;
+    public const int MaxPerWave = 18, HordeChance = 40;
+
+    /// <summary>A horde: 12 to 20 fragile small fry (imps; spiderlings mixed in from the deeper floors).</summary>
+    public static EKind[] HordeWave(int tier)
+    {
+        int n = 12 + Math.Min(8, tier);
+        return [.. Enumerable.Range(0, n).Select(i => tier >= 8 && i % 2 == 1 ? EKind.Spiderling : EKind.Imp)];
+    }
+
     static EKind[] Wave(Rng rng, int tier, float budget)
     {
         var open = Pool.Where(x => x.From <= tier).ToArray();
         var list = new List<EKind>();
-        while (list.Count < 10)
+        while (list.Count < MaxPerWave)
         {
             var fit = open.Where(x => x.Cost <= budget + 0.01f).ToArray();
             if (fit.Length == 0) break;
@@ -242,7 +256,7 @@ public sealed partial class World
         node.Seen = true;
         Pillars.Clear();
         Pillars.AddRange(Dungeon.Layouts[node.Layout]);
-        Enemies.Clear(); Projs.Clear(); Bombs.Clear(); Altars.Clear(); pending.Clear();
+        Enemies.Clear(); Projs.Clear(); Bombs.Clear(); Altars.Clear(); pending.Clear(); Incoming.Clear();
         Wave = -1; GuardianUp = false; PortalOpen = false;
         var p = Player;
         if (via is { } s)
@@ -276,7 +290,7 @@ public sealed partial class World
                 Phase = Phase.Fighting;
                 if (Wave < Room.Waves.Length)
                 {
-                    foreach (var kind in Room.Waves[Wave]) Spawn(kind, SpawnPoint());
+                    ScheduleWave(Room.Waves[Wave], Wave == Room.Horde);
                     Emit(Ev.WaveStart, Vector2.Zero, (int)Room.Kind, Wave);
                 }
                 else
@@ -294,7 +308,8 @@ public sealed partial class World
                 return;
 
             case Phase.Fighting:
-                if (Enemies.Count > 0 || ChainRunning) return;
+                StepIncoming();
+                if (Enemies.Count > 0 || ChainRunning || Incoming.Count > 0) return;
                 Projs.RemoveAll(pr => !pr.Friendly); // stale shots must not hit during the pause or after victory
                 Bombs.RemoveAll(b => !b.Friendly);
                 if (!GuardianUp)
@@ -307,6 +322,11 @@ public sealed partial class World
                 Room.Cleared = true;
                 GuardianUp = false;
                 Player.Hp = Math.Min(Player.MaxHp, Player.Hp + RoomClearHeal);
+                if (BossRoom) // the guardian drops the red potion (it is no longer an altar offer)
+                {
+                    Player.Hp = Math.Min(Player.MaxHp, Player.Hp + Offer.HealAmount);
+                    Emit(Ev.Heal, Player.Pos, Offer.HealAmount);
+                }
                 Player.Recover = Math.Min(Player.Recover, Player.MaxHp - Player.Hp);
                 if (BossRoom && Map.Floor >= Dungeon.Floors - 1)
                 {
@@ -348,7 +368,8 @@ public sealed partial class World
         };
     }
 
-    /// <summary>Three pedestals: a sword you are not holding and two relics (a potion instead of one when hurt).</summary>
+    /// <summary>Three pedestals: a sword you are not holding and two relics. (Healing competing with power made a dull
+    /// choice, so the potion now drops from the floor's guardian instead.)</summary>
     void RaiseAltars()
     {
         Altars.Clear();
@@ -362,9 +383,57 @@ public sealed partial class World
             relics.Remove(r);
             offers.Add(new Offer(OfferKind.Relic, Relic: r));
         }
-        if (Player.Hp < Player.MaxHp * 0.6f) offers[2] = new Offer(OfferKind.Heal);
         Room.Pending = offers.ToArray();
         PlaceAltars(Room.Pending);
+    }
+
+    /// <summary>Enemies on their way in: each one is announced by a mark on the floor, then steps in.</summary>
+    public readonly record struct Arrival(EKind Kind, Vector2 Pos, int At, bool Fragile);
+    public readonly List<Arrival> Incoming = [];
+    /// <summary>A wave enters in groups of three, from the edges of the room, each group this many frames apart
+    /// (a horde faster); every arrival is marked on the floor MarkLead frames before it steps in.</summary>
+    public const int GroupSize = 3, GroupGap = 45, HordeGap = 22, MarkLead = 40, FragileHp = 10;
+    int waveClock;
+
+    void ScheduleWave(EKind[] kinds, bool horde)
+    {
+        waveClock = 0;
+        for (int i = 0; i < kinds.Length; i++)
+            Incoming.Add(new Arrival(kinds[i], EdgePoint(), MarkLead + (i / GroupSize) * (horde ? HordeGap : GroupGap), horde));
+    }
+
+    void StepIncoming()
+    {
+        if (Incoming.Count == 0) return;
+        foreach (var a in Incoming)
+            if (a.At - waveClock == MarkLead) Emit(Ev.SpawnMark, a.Pos, MarkLead, (int)a.Kind);
+        foreach (var a in Incoming)
+        {
+            if (a.At > waveClock) continue;
+            var e = Spawn(a.Kind, a.Pos);
+            if (a.Fragile) e.Hp = e.MaxHp = Math.Min(e.MaxHp, FragileHp);
+        }
+        Incoming.RemoveAll(a => a.At <= waveClock);
+        waveClock++;
+    }
+
+    /// <summary>A point along the walls, away from the player and clear of pillars.</summary>
+    Vector2 EdgePoint()
+    {
+        const float inset = 70f;
+        for (int i = 0; i < 30; i++)
+        {
+            float t = Rng.Range(-1f, 1f);
+            var pos = (Rng.Next() % 4) switch
+            {
+                0 => new Vector2(t * (Tune.HalfW - inset), -Tune.HalfH + inset),
+                1 => new Vector2(Tune.HalfW - inset, t * (Tune.HalfH - inset)),
+                2 => new Vector2(t * (Tune.HalfW - inset), Tune.HalfH - inset),
+                _ => new Vector2(-Tune.HalfW + inset, t * (Tune.HalfH - inset)),
+            };
+            if (Vector2.Distance(pos, Player.Pos) > 220f && !InsidePillar(pos, 50f)) return pos;
+        }
+        return SpawnPoint();
     }
 
     void PlaceAltars(Offer[] offers)

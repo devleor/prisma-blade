@@ -70,6 +70,7 @@ public static class Ink
         var off = new Vector2(1.6f, 1.4f) + J(seed, 97, 1.2f);
         var moved = new Vector2[pts.Length];
         for (int i = 0; i < pts.Length; i++) moved[i] = pts[i] + off;
+        if (InkBatch.Active(ci)) { InkBatch.Polygon(moved, c); return; } // a folded wobble is skipped inside
         if (Geometry2D.TriangulatePolygon(moved).Length == 0) return; // a wobble folded it: skip this boil
         ci.DrawColoredPolygon(moved, c);
     }
@@ -102,8 +103,14 @@ public static class Ink
             a[0] += (a[0] - a[1]).Normalized() * w * 0.6f;
             a[n - 1] += (a[n - 1] - a[n - 2]).Normalized() * w * 0.6f;
         }
-        ci.DrawPolyline(a, c, w, true);
         var thin = c; thin.A *= 0.55f;
+        if (InkBatch.Active(ci))
+        {
+            InkBatch.Polyline(a, c, w);
+            InkBatch.Polyline(b, thin, Mathf.Max(1f, w * 0.4f));
+            return;
+        }
+        ci.DrawPolyline(a, c, w, true);
         ci.DrawPolyline(b, thin, Mathf.Max(1f, w * 0.4f), true);
     }
 
@@ -139,7 +146,8 @@ public static class Ink
                 if (s1 - s0 < 2f) continue;
                 var p0 = nrm * t + dir * s0 + J(seed, line, 0.8f);
                 var p1 = nrm * t + dir * s1 + J(seed + 7, line, 0.8f);
-                ci.DrawLine(p0, p1, col, w, true);
+                if (InkBatch.Active(ci)) InkBatch.Line(p0, p1, col, w);
+                else ci.DrawLine(p0, p1, col, w, true);
             }
         }
     }
@@ -186,6 +194,7 @@ public static class Ink
     public static void Write(CanvasItem ci, Vector2 pos, string s, int size, Color col, float width = 400f, bool halo = true)
     {
         var at = pos - new Vector2(width / 2, 0);
+        if (InkBatch.Active(ci)) InkBatch.Flush(); // text is drawn directly: put the batched ink under it first
         if (halo)
         {
             var h = Paper; h.A = col.A * 0.85f;

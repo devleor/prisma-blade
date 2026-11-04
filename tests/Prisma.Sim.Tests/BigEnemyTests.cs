@@ -132,13 +132,13 @@ public class BigEnemyTests
             for (int f = 0; f < Dungeon.Floors; f++)
                 foreach (var r in Dungeon.Make(seed, f).Rooms.Values)
                 {
-                    seen.UnionWith(r.Waves.SelectMany(x => x));
+                    seen.UnionWith(r.Waves.Where((_, i) => i != r.Horde).SelectMany(x => x));
                     guards.UnionWith(r.Guardians);
                     if (f == 0) Assert.DoesNotContain(EKind.Ogre, r.Waves.SelectMany(x => x).Concat(r.Guardians));
                 }
         Assert.Contains(EKind.Ogre, seen);
         Assert.Contains(EKind.Brood, seen);
         Assert.Contains(EKind.Ogre, guards);
-        Assert.DoesNotContain(EKind.Spiderling, seen); // they only hatch
+        Assert.DoesNotContain(EKind.Spiderling, seen); // outside a horde they only hatch
     }
 }

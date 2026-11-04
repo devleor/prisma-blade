@@ -191,10 +191,12 @@ public class RunTests
         var room = w.Room;
         Run(w, 52);
         Assert.Equal(0, w.Wave);
+        Arrive(w);
         Assert.Equal(room.Waves[0].Length, w.Enemies.Count);
         for (int i = 0; i < room.Waves.Length; i++)
         {
             Assert.False(w.GuardianUp);
+            Arrive(w);
             foreach (var e in w.Enemies) e.Hp = 0;
             var ev = Run(w, 2);
             Assert.Contains(ev, x => x.Kind == Ev.WaveClear);
@@ -383,17 +385,113 @@ public class RunTests
         }
     }
 
+    /// <summary>Lets every arrival of the running wave step in (they come in groups, each after its mark).</summary>
+    static void Arrive(World w)
+    {
+        for (int i = 0; i < 600 && w.Incoming.Count > 0; i++) w.Step(new Inputs());
+        Assert.Empty(w.Incoming);
+    }
+
     [Fact]
-    public void Badly_hurt_the_third_altar_holds_a_potion()
+    public void Even_badly_hurt_the_altars_offer_power_not_a_potion()
     {
         var w = InFight(2);
         GuardiansDown(w);
         w.Player.Hp = 20;
         Run(w, 2);
         Assert.Equal(20 + World.RoomClearHeal, w.Player.Hp);
-        Assert.Equal(OfferKind.Heal, w.Altars[2].Offer.Kind);
-        w.TakeAltar(2);
-        Assert.Equal(20 + World.RoomClearHeal + Offer.HealAmount, w.Player.Hp);
+        Assert.Equal(OfferKind.Relic, w.Altars[2].Offer.Kind);
+    }
+
+    [Fact]
+    public void A_wave_steps_in_by_threes_each_marked_on_the_floor_first()
+    {
+        var w = InFight(3);
+        var kinds = w.Room.Waves[0];
+        var ev = new List<GameEvent>();
+        for (int i = 0; i < 600 && (w.Wave < 0 || w.Incoming.Count > 0); i++) { w.Step(new Inputs()); ev.AddRange(w.Events); }
+        var marks = ev.Where(e => e.Kind == Ev.SpawnMark).ToList();
+        Assert.Equal(kinds.Length, marks.Count);
+        Assert.All(marks, m => Assert.Equal(World.MarkLead, (int)m.A));
+        Assert.Equal(kinds.Length, w.Enemies.Count);
+        Assert.All(marks, m => Assert.True(MathF.Abs(m.Pos.X) > Tune.HalfW - 120f || MathF.Abs(m.Pos.Y) > Tune.HalfH - 120f, $"mark at {m.Pos} is not by a wall"));
+        if (kinds.Length > World.GroupSize)
+        {
+            // the first group is on the floor before the second one's marks appear
+            var w2 = InFight(3);
+            int firstSpawn = -1, secondMark = -1, marksSeen = 0;
+            for (int f = 0; f < 600 && (secondMark < 0 || firstSpawn < 0); f++)
+            {
+                w2.Step(new Inputs());
+                foreach (var e in w2.Events.Where(e => e.Kind == Ev.SpawnMark)) if (++marksSeen == World.GroupSize + 1) secondMark = f;
+                if (firstSpawn < 0 && w2.Enemies.Count > 0) firstSpawn = f;
+            }
+            Assert.True(firstSpawn <= secondMark, $"first group at {firstSpawn}, second marked at {secondMark}");
+        }
+    }
+
+    [Fact]
+    public void Waves_are_bigger_and_some_rooms_hold_a_horde_of_fragile_small_fry()
+    {
+        int hordes = 0, biggest = 0, firstRoomMost = 0;
+        for (uint seed = 1; seed <= 40; seed++)
+            for (int f = 0; f < Dungeon.Floors; f++)
+                foreach (var r in Dungeon.Make(seed, f).Rooms.Values)
+                {
+                    foreach (var wave in r.Waves) Assert.True(wave.Length <= Math.Max(Dungeon.MaxPerWave, 20));
+                    biggest = Math.Max(biggest, r.Waves.Where((_, i) => i != r.Horde).Select(x => x.Length).DefaultIfEmpty().Max());
+                    if (f == 0 && r.Depth == 1 && r.Horde < 0) firstRoomMost = Math.Max(firstRoomMost, r.Waves.Select(x => x.Length).DefaultIfEmpty().Max());
+                    if (r.Horde >= 0)
+                    {
+                        hordes++;
+                        Assert.Equal(RoomKind.Fight, r.Kind);
+                        Assert.InRange(r.Waves[r.Horde].Length, 12, 20);
+                        Assert.All(r.Waves[r.Horde], k => Assert.True(k is EKind.Imp or EKind.Spiderling));
+                    }
+                }
+        Assert.True(hordes > 40, $"only {hordes} hordes");
+        Assert.True(biggest >= 14, $"the biggest wave has {biggest}");
+        Assert.True(firstRoomMost >= 4, $"first rooms top out at {firstRoomMost}");
+
+        // horde enemies die to one cut of the starting sword
+        for (uint seed = 1; seed <= 60; seed++)
+        {
+            var w = new World(seed, waves: true);
+            var room = w.Map.Rooms.Values.FirstOrDefault(r => r.Horde >= 0);
+            if (room == null) continue;
+            w.EnterRoom(room, Side.S);
+            w.Player.Invuln = 100000;
+            for (int i = 0; i < 4000 && w.Wave < room.Horde; i++) { w.Step(new Inputs()); if (w.Wave < room.Horde) foreach (var e in w.Enemies) e.Hp = 0; }
+            Arrive(w);
+            Assert.All(w.Enemies, e => Assert.True(e.Hp <= World.FragileHp && e.Hp < Moves.Light[0].Damage));
+            return;
+        }
+        Assert.Fail("no horde room in 60 seeds");
+    }
+
+    [Fact]
+    public void The_floor_guardian_drops_the_red_potion()
+    {
+        var w = new World(seed: 4, waves: true);
+        w.EnterRoom(w.Map.Boss, Side.S);
+        w.Wave = w.Room.Waves.Length;
+        w.GuardianUp = true;
+        w.Phase = Phase.Fighting;
+        w.Player.Hp = 10;
+        var ev = Run(w, 2);
+        Assert.Contains(ev, e => e.Kind == Ev.Heal && (int)e.A == Offer.HealAmount);
+        Assert.Equal(10 + World.RoomClearHeal + Offer.HealAmount, w.Player.Hp);
+    }
+
+    [Fact]
+    public void The_scythe_no_longer_sweeps_all_around_and_wind_boots_bottom_out()
+    {
+        var foice = Weapon.Of(WKind.Foice);
+        Assert.All(foice.Light, s => Assert.True(MathF.Abs(s.ArcEnd - s.ArcStart) < 3.9f && s.Reach <= 150f));
+        var w = Arena();
+        int base0 = w.Player.DashCooldown;
+        w.Player.Relics[(int)RKind.PeLeve] = 5;
+        Assert.True(w.Player.DashCooldown >= (int)MathF.Round(base0 * Relics.PeLeveFloor) - 1, $"{w.Player.DashCooldown} vs base {base0}");
     }
 
     [Fact]
@@ -549,7 +647,7 @@ public class RunTests
         var e = Dummy(w, EKind.Bastion, Up * 70f);
         int hp = e.Hp;
         Tap(w, new Inputs { Light = true, Aim = Up }, 25);
-        Assert.Equal(hp - (int)MathF.Ceiling(Moves.Light[0].Damage * 1.3f - 0.001f), e.Hp);
+        Assert.Equal(hp - (int)MathF.Ceiling(Moves.Light[0].Damage * (1f + 2 * Relics.AfiacaoMul) - 0.001f), e.Hp); // +10% each
     }
 
     [Fact]

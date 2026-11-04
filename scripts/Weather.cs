@@ -205,6 +205,52 @@ public partial class Weather : Node2D
 
     public override void _Draw()
     {
+        long t = Prof.Begin();
+        InkBatch.Begin(this);
+        DrawBody();
+        InkBatch.End();
+        Prof.End("draw:weather", t);
+    }
+
+    // ---- Draw* inside an ink batch become triangles (see InkBatch); outside one they draw directly ----
+    new void DrawCircle(Vector2 position, float radius, Color color, bool filled = true, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Circle(position, radius, color, filled, width < 0 ? 1f : width);
+        else base.DrawCircle(position, radius, color, filled, width, antialiased);
+    }
+
+    new void DrawLine(Vector2 from, Vector2 to, Color color, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Line(from, to, color, width < 0 ? 1f : width);
+        else base.DrawLine(from, to, color, width, antialiased);
+    }
+
+    new void DrawColoredPolygon(Vector2[] points, Color color, Vector2[]? uvs = null, Texture2D? texture = null)
+    {
+        if (InkBatch.Active(this) && texture == null) InkBatch.Polygon(points, color);
+        else { if (InkBatch.Active(this)) InkBatch.Flush(); base.DrawColoredPolygon(points, color, uvs, texture); }
+    }
+
+    new void DrawPolyline(Vector2[] points, Color color, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Polyline(points, color, width < 0 ? 1f : width);
+        else base.DrawPolyline(points, color, width, antialiased);
+    }
+
+    new void DrawArc(Vector2 center, float radius, float startAngle, float endAngle, int pointCount, Color color, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Arc(center, radius, startAngle, endAngle, pointCount, color, width < 0 ? 1f : width);
+        else base.DrawArc(center, radius, startAngle, endAngle, pointCount, color, width, antialiased);
+    }
+
+    new void DrawRect(Rect2 rect, Color color, bool filled = true, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Rect(rect, color, filled, width < 0 ? 1f : width);
+        else base.DrawRect(rect, color, filled, width, antialiased);
+    }
+
+    void DrawBody()
+    {
         switch (Kind)
         {
             case Sky.Rain:

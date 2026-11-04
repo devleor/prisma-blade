@@ -46,9 +46,9 @@ public sealed record Weapon(
 
     public static readonly Weapon Foice = new(WKind.Foice, "Foice", "arco largo e alcance longo; cada abate cura 3",
     [
-        new(7, 6, 16, -2.0f, 1.9f, 150f, 10, 220f, 200f, 3, 0, 10),
-        new(7, 6, 16, 2.0f, -1.9f, 150f, 11, 230f, 210f, 3, 0, 11),
-        new(10, 8, 22, -2.9f, 2.9f, 165f, 17, 300f, 380f, 5, 1, 18),
+        new(7, 6, 16, -1.9f, 1.8f, 140f, 10, 220f, 200f, 3, 0, 10),
+        new(7, 6, 16, 1.9f, -1.8f, 140f, 11, 230f, 210f, 3, 0, 11),
+        new(10, 8, 22, -1.9f, 1.9f, 150f, 17, 300f, 380f, 5, 1, 18), // was 330° and 165 px: with big waves it beat everything
     ], HeavyReach: 45f, HeavyWindup: 2, KillHeal: 3);
 
     public static readonly Weapon Katana = new(WKind.Katana, "Katana do Eco", "cortes precisos; dash perfeito mais fácil e o próximo golpe dá dano dobrado",
@@ -104,7 +104,7 @@ public static class Relics
     public static string Blurb(RKind k) => k switch
     {
         RKind.Coracao => "+20 de vida máxima",
-        RKind.Afiacao => "+15% de dano",
+        RKind.Afiacao => "+10% de dano",
         RKind.PeLeve => "dash recarrega 35% mais rápido",
         RKind.Brasa => "golpes queimam (4 de dano por meio segundo)",
         RKind.Sede => "cada abate cura 4",
@@ -113,7 +113,7 @@ public static class Relics
     };
 
     public const int CoracaoHp = 20, BurnFrames = 120, BurnTick = 30, BurnDamage = 4, SedeHeal = 4, EspinhosDamage = 25;
-    public const float AfiacaoMul = 0.15f, PeLeveMul = 0.65f, FocoMul = 0.5f;
+    public const float AfiacaoMul = 0.10f, PeLeveMul = 0.65f, PeLeveFloor = 0.4f, FocoMul = 0.5f;
 }
 
 public enum OfferKind { Weapon, Relic, Heal }

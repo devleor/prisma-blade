@@ -121,6 +121,52 @@ public partial class Main
 
     public override void _Draw()
     {
+        long t = Prof.Begin();
+        InkBatch.Begin(this);
+        DrawBody();
+        InkBatch.End();
+        Prof.End("draw:main", t);
+    }
+
+    // ---- Draw* inside an ink batch become triangles (see InkBatch); outside one they draw directly ----
+    new void DrawCircle(Vector2 position, float radius, Color color, bool filled = true, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Circle(position, radius, color, filled, width < 0 ? 1f : width);
+        else base.DrawCircle(position, radius, color, filled, width, antialiased);
+    }
+
+    new void DrawLine(Vector2 from, Vector2 to, Color color, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Line(from, to, color, width < 0 ? 1f : width);
+        else base.DrawLine(from, to, color, width, antialiased);
+    }
+
+    new void DrawColoredPolygon(Vector2[] points, Color color, Vector2[]? uvs = null, Texture2D? texture = null)
+    {
+        if (InkBatch.Active(this) && texture == null) InkBatch.Polygon(points, color);
+        else { if (InkBatch.Active(this)) InkBatch.Flush(); base.DrawColoredPolygon(points, color, uvs, texture); }
+    }
+
+    new void DrawPolyline(Vector2[] points, Color color, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Polyline(points, color, width < 0 ? 1f : width);
+        else base.DrawPolyline(points, color, width, antialiased);
+    }
+
+    new void DrawArc(Vector2 center, float radius, float startAngle, float endAngle, int pointCount, Color color, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Arc(center, radius, startAngle, endAngle, pointCount, color, width < 0 ? 1f : width);
+        else base.DrawArc(center, radius, startAngle, endAngle, pointCount, color, width, antialiased);
+    }
+
+    new void DrawRect(Rect2 rect, Color color, bool filled = true, float width = -1f, bool antialiased = false)
+    {
+        if (InkBatch.Active(this)) InkBatch.Rect(rect, color, filled, width < 0 ? 1f : width);
+        else base.DrawRect(rect, color, filled, width, antialiased);
+    }
+
+    void DrawBody()
+    {
         float hw = Tune.HalfW, hh = Tune.HalfH;
         DrawGates();
         if (World.PortalOpen) DrawPortal();
@@ -166,7 +212,7 @@ public partial class Main
                 Ink.Stroke(this, [tip + inward * 22 + along * 12, tip, tip + inward * 22 - along * 12], false, 3f, seed + 2, new Color(0.95f, 0.85f, 0.6f, 0.9f));
                 var next = World.Map.Neighbor(World.Room, s)!;
                 string mark = !next.Seen ? "?" : next.Kind switch { RoomKind.Boss => "鬼", RoomKind.Treasure => "宝", RoomKind.Elite => "★", _ => next.Cleared ? "" : "!" };
-                if (mark != "") DrawString(Hud.Kanji, d + inward * 70 - new Vector2(20, -8), mark, HorizontalAlignment.Center, 40, 24, new Color(Ink.Line, 0.8f));
+                if (mark != "") { InkBatch.Flush(); DrawString(Hud.Kanji, d + inward * 70 - new Vector2(20, -8), mark, HorizontalAlignment.Center, 40, 24, new Color(Ink.Line, 0.8f)); }
             }
             else
             {

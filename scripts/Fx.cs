@@ -117,6 +117,13 @@ public partial class Fx : Node2D
 
     public override void _Draw()
     {
+        long t = Prof.Begin();
+        DrawBody();
+        Prof.End("draw:fx", t);
+    }
+
+    void DrawBody()
+    {
         foreach (var p in puffs)
         {
             var tex = puffTex[p.Tex];

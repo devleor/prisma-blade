@@ -123,5 +123,9 @@ do inimigo atingido.
 - Dê uma semente própria a cada forma (`e.Id * 131 + n` nas criaturas); nunca reaproveite a de outra peça.
 - Monte com `Ink.Shape(pontos, cor, semente, largura, hachura)`; contorno de 2,5 a 3 para corpos, 1,5 para detalhes.
 - Cor nova de inimigo: tom de aquarela meio apagado (saturação média), nunca neon. Brilho só para magia.
+- Desenhe pelo `Ink` ou pelos `Draw*` da própria classe: dentro do `_Draw` tudo cai num lote só (`InkBatch`, ADR 0013).
+  Chamada direta ao motor ali dentro precisa de `InkBatch.Flush()` antes. Depois de arte grande, rode
+  `scenes/tests/Stress.tscn` (sem som) e confira o tempo por quadro.
+- **Marca de entrada:** onde um inimigo vai entrar, dois anéis de tinta na cor dele se fecham por 0,66 s, e fica uma gota.
 - Confira com a cena `scenes/tests/Snapshot.tscn` (`node tools/verify.mjs --gpu`), que salva capturas em
   `test-results/`, sempre sem som (`--audio-driver Dummy`).

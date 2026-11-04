@@ -48,7 +48,8 @@ public sealed class Player
     public int PerfectWindow => Tune.PerfectFrames + Weapon.PerfectBonus;
     public float DamageMul => 1f + Prisma.Sim.Relics.AfiacaoMul * Has(RKind.Afiacao);
     public float FocusMul => Weapon.FocusGain * (1f + Prisma.Sim.Relics.FocoMul * Has(RKind.Foco));
-    public int DashCooldown => Math.Max(6, (int)MathF.Round(Weapon.DashCooldown * MathF.Pow(Prisma.Sim.Relics.PeLeveMul, Has(RKind.PeLeve))));
+    /// <summary>Wind boots stack, but never below 40% of the weapon's recharge (three pairs used to make it ~0).</summary>
+    public int DashCooldown => Math.Max(6, (int)MathF.Round(Weapon.DashCooldown * MathF.Max(Prisma.Sim.Relics.PeLeveFloor, MathF.Pow(Prisma.Sim.Relics.PeLeveMul, Has(RKind.PeLeve)))));
 
     public bool Alive => State != PState.Dead;
     public bool Invulnerable => Invuln > 0 || (State == PState.Dash && T <= Tune.DashIFrames);
@@ -160,6 +161,8 @@ public enum Ev
     Stomp, Hatch,
     /// <summary>GuardBreak: a hit broke an enemy's guard (poise), so it is stunned (I = kind).</summary>
     GuardBreak,
+    /// <summary>SpawnMark: an enemy will step in here in A frames (I = kind): the view inks a mark on the floor.</summary>
+    SpawnMark,
 }
 
 /// <summary>Something the view should show or play this frame. A is a magnitude, I a kind/index.</summary>
