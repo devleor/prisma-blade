@@ -68,7 +68,11 @@ public partial class GameCheck : Node
                 Input.ActionPress(Controls.Dash);
                 break;
             case 91: Input.ActionRelease(Controls.Dash); break;
-            case 94: Check(p.State == PState.Dash, "dash starts on the dash action"); break;
+            case 94:
+                Check(p.State == PState.Dash, "dash starts on the dash action");
+                Check(main.Sfx.Variants("dash") == 3 && main.Sfx.Variants("dash_air") == 1, "the dash sounds are the three bamboo swishes and the air of Erase/Escape");
+                Check(main.Sfx.Variants("perfect") == 1 && main.Sfx.Variants("perfect_morph") == 1, "the perfect dodge has its bell and its time morph");
+                break;
             case 130: Input.ActionPress(Controls.Heavy); break;
             case 140:
                 Check(main.WeatherFx.Kind == Sky.None, "the dungeon floor has no weather");

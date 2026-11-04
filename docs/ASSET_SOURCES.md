@@ -13,7 +13,8 @@ Kenney packs: https://kenney.nl/assets/<slug> - author Kenney (www.kenney.nl) - 
 | swing3.wav | swish-5.wav | Swishes Sound Pack | same | same | CC0 |
 | heavy_swing.wav | swish-8.wav | Swishes Sound Pack (pitch down in-engine for depth) | same | same | CC0 |
 | charge.ogg | phaserUp1.ogg | Digital Audio | https://kenney.nl/assets/digital-audio | Kenney | CC0 |
-| dash.ogg | phaseJump1.ogg | Digital Audio | https://kenney.nl/assets/digital-audio | Kenney | CC0 |
+| dash1.wav, dash2.wav, dash3.wav | swosh-07/11/15.flac (convertidos para wav mono, aparados e normalizados) | Swish - bamboo stick weapon swhoshes | https://opengameart.org/node/2242 | qubodup (Iwan Gabovitch) | CC0 |
+| dash_air.wav | erase.wav (aparado em 0,7 s, normalizado) | Erase / Escape | https://opengameart.org/content/erase-escape | Fupi | CC0 |
 | player_hurt.ogg | lowDown.ogg | Digital Audio | https://kenney.nl/assets/digital-audio | Kenney | CC0 |
 | hit1.ogg | knifeSlice.ogg | RPG Audio | https://kenney.nl/assets/rpg-audio | Kenney | CC0 |
 | hit2.ogg | impactMetal_medium_000.ogg | Impact Sounds | https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
@@ -22,7 +23,8 @@ Kenney packs: https://kenney.nl/assets/<slug> - author Kenney (www.kenney.nl) - 
 | shatter.ogg | impactGlass_heavy_001.ogg | Impact Sounds | https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
 | enemy_die.ogg | impactGlass_light_000.ogg | Impact Sounds | https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
 | wave_start.ogg | impactBell_heavy_000.ogg | Impact Sounds | https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
-| perfect.ogg | confirmation_002.ogg | Interface Sounds | https://kenney.nl/assets/interface-sounds | Kenney | CC0 |
+| perfect_bell.wav | pleasing-bell.wav (mono, normalizado) | Pleasing Bell Sound Effect | https://opengameart.org/content/pleasing-bell-sound-effect | Spring Spring | CC0 |
+| perfect_morph.wav | qubodup-slomo1.wav (de qubodup-timehitwind.zip, mono, normalizado) | Wind, hit, time morph | https://opengameart.org/content/wind-hit-time-morph | qubodup | CC0 |
 | enemy_shoot.ogg | laserSmall_000.ogg | Sci-fi Sounds | https://kenney.nl/assets/sci-fi-sounds | Kenney | CC0 |
 | victory.ogg | Steel jingles/jingles_STEEL07.ogg | Music Jingles | https://kenney.nl/assets/music-jingles | Kenney | CC0 |
 | defeat.ogg | Sax jingles/jingles_SAX07.ogg | Music Jingles | https://kenney.nl/assets/music-jingles | Kenney | CC0 |

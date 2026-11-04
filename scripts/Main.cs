@@ -302,7 +302,8 @@ public partial class Main : Node2D
             }
             case Ev.Dash:
                 Hud.Speed();
-                Sfx.Play("dash", -4f, 1.15f);
+                Sfx.Play("dash", -3f, 1.05f);         // a bamboo swish...
+                Sfx.Play("dash_air", -12f, 1.25f);    // ...and the air it leaves behind
                 Fx.Puff(pos, new Color(0.55f, 0.48f, 0.4f, 0.5f), 0.35f, 3);
                 break;
             case Ev.WallHit:
@@ -325,7 +326,8 @@ public partial class Main : Node2D
                 Shake(0.2f);
                 break;
             case Ev.Perfect:
-                Sfx.Play("perfect", 2f, 1f, 0f);
+                Sfx.Play("perfect", -2f, 1f, 0f);       // a clear bell...
+                Sfx.Play("perfect_morph", -6f, 1f, 0f); // ...and time bending around the dodge
                 Fx.Ring(pos, 20, Tune.PerfectMarkRadius, 0.5f, MagicCol, 6f);
                 Hud.Perfect();
                 Hud.Speed();

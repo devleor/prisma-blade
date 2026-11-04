@@ -19,6 +19,9 @@ public partial class Sfx : Node
     public string CurrentMusic => current;
     public bool MusicPlaying => music.Playing;
 
+    /// <summary>How many variations of a sound loaded (0 when its files are missing).</summary>
+    public int Variants(string name) => lib.TryGetValue(name, out var s) ? s.Length : 0;
+
     static readonly (string name, string[] files)[] Sounds =
     [
         ("swing", ["swing1", "swing2", "swing3", "swing4"]),
@@ -32,8 +35,10 @@ public partial class Sfx : Node
         ("charge", ["charge"]),
         ("hit", ["hit1", "hit2", "hit3"]),
         ("heavy_hit", ["heavy_hit"]),
-        ("dash", ["dash"]),
-        ("perfect", ["perfect"]),
+        ("dash", ["dash1", "dash2", "dash3"]),        // bamboo swishes (qubodup, CC0)
+        ("dash_air", ["dash_air"]),                    // Erase / Escape (Fupi, CC0)
+        ("perfect", ["perfect_bell"]),                 // Pleasing bell (Spring Spring, CC0)
+        ("perfect_morph", ["perfect_morph"]),          // Wind, hit, time morph (qubodup, CC0)
         ("shatter", ["shatter"]),
         ("enemy_shoot", ["enemy_shoot"]),
         ("player_hurt", ["player_hurt"]),
