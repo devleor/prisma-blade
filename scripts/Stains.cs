@@ -80,6 +80,7 @@ public partial class Stains : Node2D
 
     void Add(Vector2[] pts, Color c)
     {
+        if (Geometry2D.TriangulatePolygon(pts).Length == 0) return; // a blob the jitter folded over itself: skip it once, here
         stains.Add(new Stain(pts, c));
         if (stains.Count > Max) stains.RemoveAt(0); // the oldest dry into the paper
         dirty = true;
@@ -95,6 +96,6 @@ public partial class Stains : Node2D
     public override void _Draw()
     {
         foreach (var s in stains)
-            if (Geometry2D.TriangulatePolygon(s.Pts).Length > 0) DrawColoredPolygon(s.Pts, s.Col);
+            DrawColoredPolygon(s.Pts, s.Col);
     }
 }

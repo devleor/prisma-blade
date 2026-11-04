@@ -87,6 +87,14 @@ public class RunTests
                 var b = Dungeon.Make(seed, floor);
                 Assert.Equal(Dungeon.RoomCount(floor), a.Rooms.Count);
                 Assert.Equal(a.Rooms.Keys.OrderBy(k => k), b.Rooms.Keys.OrderBy(k => k));
+                foreach (var (k, ra) in a.Rooms)
+                {
+                    var rb = b.Rooms[k];
+                    Assert.Equal((ra.Kind, ra.Layout, ra.Seed, ra.Depth), (rb.Kind, rb.Layout, rb.Seed, rb.Depth));
+                    Assert.Equal(ra.Guardians, rb.Guardians);
+                    Assert.Equal(ra.Waves.Length, rb.Waves.Length);
+                    for (int i = 0; i < ra.Waves.Length; i++) Assert.Equal(ra.Waves[i], rb.Waves[i]);
+                }
                 Assert.Equal(RoomKind.Start, a.Start.Kind);
                 Assert.Equal(0, a.Start.Depth);
                 // a tree: every room but the start has exactly one door toward the start
@@ -233,6 +241,77 @@ public class RunTests
         Assert.Equal(3, w.Altars.Count);
         Run(w, 200);
         Assert.Empty(w.Enemies);
+    }
+
+    [Fact]
+    public void Offers_left_on_their_altars_wait_for_you_and_a_taken_one_does_not_come_back()
+    {
+        var w = InFight(9);
+        var room = w.Room;
+        GuardiansDown(w);
+        Run(w, 2);
+        var offers = w.Altars.Select(a => a.Offer).ToArray();
+        w.EnterRoom(w.Map.Start, Side.N);
+        Assert.Empty(w.Altars);
+        w.EnterRoom(room, Side.S);
+        Assert.Equal(offers, w.Altars.Select(a => a.Offer).ToArray());
+        w.TakeAltar(1);
+        w.EnterRoom(w.Map.Start, Side.N);
+        w.EnterRoom(room, Side.S);
+        Assert.Empty(w.Altars);
+    }
+
+    [Fact]
+    public void A_sweep_over_two_altars_takes_the_one_aimed_at()
+    {
+        var w = InFight(3);
+        GuardiansDown(w);
+        Run(w, 2);
+        w.Pillars.Clear();
+        var relic = w.Altars[1].Offer;
+        // between altars 0 and 1, aiming a little toward 1: the first Longa cut (-1.4..+1.3 rad) covers both
+        w.Player.Pos = new Vector2(-80f, -130f);
+        float aim = -80f * MathF.PI / 180f;
+        float Rel(Vector2 at) => Tune.Wrap(Tune.Angle(at - w.Player.Pos) - aim);
+        Assert.InRange(Rel(World.AltarSpots[0]), Moves.Light[0].ArcStart, Moves.Light[0].ArcEnd);
+        Assert.InRange(Rel(World.AltarSpots[1]), Moves.Light[0].ArcStart, Moves.Light[0].ArcEnd);
+        Assert.True(MathF.Abs(Rel(World.AltarSpots[1])) < MathF.Abs(Rel(World.AltarSpots[0])));
+        Assert.True(Vector2.Distance(w.Player.Pos, World.AltarSpots[0]) < Moves.Light[0].Reach + Altar.Radius - 12f); // margin for the step back at the windup
+        Assert.True(Vector2.Distance(w.Player.Pos, World.AltarSpots[1]) < Moves.Light[0].Reach + Altar.Radius - 12f); // margin for the step back at the windup
+        var ev = Tap(w, new Inputs { Light = true, Aim = new Vector2(MathF.Cos(aim), MathF.Sin(aim)) }, 20);
+        Assert.Contains(ev, x => x.Kind == Ev.Reward && x.I == 1);
+        Assert.Equal(1, w.Player.Has(relic.Relic));
+    }
+
+    [Fact]
+    public void Only_your_own_kills_heal_an_enemy_bomb_killing_a_foe_does_not()
+    {
+        var w = Holding(WKind.Foice);
+        w.Player.Relics[(int)RKind.Sede] = 1;
+        w.Player.Hp = 50;
+        var far = new Vector2(0f, -300f);
+        var e = Dummy(w, EKind.Spike, far);
+        e.Hp = 1;
+        w.Bombs.Add(new Bomb { From = e.Pos + new Vector2(100f, 0f), To = e.Pos, T = 45f });
+        Run(w, 3);
+        Assert.Equal(EState.Dead, e.State);
+        Assert.Equal(50, w.Player.Hp);
+        var mine = Dummy(w, EKind.Spike, Up * 70f);
+        mine.Hp = 1;
+        Tap(w, new Inputs { Light = true, Aim = Up }, 25);
+        Assert.Equal(EState.Dead, mine.State);
+        Assert.Equal(50 + w.Player.Weapon.KillHeal + Relics.SedeHeal, w.Player.Hp);
+    }
+
+    [Fact]
+    public void A_sword_taken_mid_chain_starts_from_its_first_cut()
+    {
+        var w = WithAltar(new Offer(OfferKind.Weapon, Weapon: WKind.Adagas));
+        w.Player.Combo = 1; w.Player.NextCombo = 2; w.Player.ComboTimer = 10; // the Longa finisher comes next
+        Tap(w, new Inputs { Light = true, Aim = Up }, 40); // the cut takes the sword
+        Assert.Equal(WKind.Adagas, w.Player.Weapon.Kind);
+        Assert.Equal(0, w.Player.NextCombo);
+        Assert.Equal(0, w.Player.ComboTimer);
     }
 
     [Fact]
@@ -470,7 +549,21 @@ public class RunTests
         var e = Dummy(w, EKind.Bastion, Up * 70f);
         int hp = e.Hp;
         Tap(w, new Inputs { Light = true, Aim = Up }, 25);
-        Assert.Equal(hp - (int)MathF.Round(Moves.Light[0].Damage * 1.3f), e.Hp);
+        Assert.Equal(hp - (int)MathF.Ceiling(Moves.Light[0].Damage * 1.3f - 0.001f), e.Hp);
+    }
+
+    [Fact]
+    public void One_whetstone_adds_damage_even_to_the_daggers_small_cuts()
+    {
+        foreach (var cut in Weapon.Of(WKind.Adagas).Light)
+            Assert.True((int)MathF.Ceiling(cut.Damage * 1.15f - 0.001f) > cut.Damage, $"a {cut.Damage} cut");
+        var w = Arena();
+        w.Player.Weapon = Weapon.Of(WKind.Adagas);
+        w.Player.Relics[(int)RKind.Afiacao] = 1;
+        var e = Dummy(w, EKind.Bastion, Up * 60f);
+        int hp = e.Hp;
+        Tap(w, new Inputs { Light = true, Aim = Up }, 25);
+        Assert.Equal(hp - (Weapon.Of(WKind.Adagas).Light[0].Damage + 1), e.Hp);
     }
 
     [Fact]

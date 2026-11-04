@@ -52,6 +52,7 @@ public partial class Main : Node2D
         Camera.MakeCurrent();
         AddChild(FloorArt = new Floor(this));
         AddChild(Stains = new Stains());
+        Stains.Show(World.Map.Floor, World.Room.X, World.Room.Y); // the start room keeps its ink too
         var env = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Canvas,

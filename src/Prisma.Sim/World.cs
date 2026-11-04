@@ -271,8 +271,21 @@ public sealed partial class World
         foreach (var b in Bombs)
             if (!b.Friendly && b.T < b.Flight - 2f && InArc(b.Ground, 14f, s.Reach, lo, hi)) BatBomb(b);
         if (GatesOpen && Altars.Count > 0)
+        {
+            // the blade reaches an altar: of every altar this whole swing covers, take the one closest to the aim,
+            // not just the first the sweep touched (a wide arc over two altars picks the one you pointed at)
+            int best = -1; float bestRel = float.MaxValue;
+            bool reached = false;
+            for (int i = 0; i < Altars.Count; i++) reached |= InArc(Altars[i].Pos, Altar.Radius, s.Reach, lo, hi);
+            if (reached)
             for (int i = 0; i < Altars.Count; i++)
-                if (InArc(Altars[i].Pos, Altar.Radius, s.Reach, lo, hi)) { TakeAltar(i); break; }
+                if (InArc(Altars[i].Pos, Altar.Radius, s.Reach, MathF.Min(s.ArcStart, s.ArcEnd), MathF.Max(s.ArcStart, s.ArcEnd)))
+                {
+                    float rel = MathF.Abs(Tune.Wrap(Tune.Angle(Altars[i].Pos - p.Pos) - p.Facing));
+                    if (rel < bestRel) { bestRel = rel; best = i; }
+                }
+            if (best >= 0) TakeAltar(best);
+        }
     }
 
     bool InArc(Vector2 pos, float radius, float reach, float lo, float hi)
@@ -307,7 +320,8 @@ public sealed partial class World
         float mul = p.DamageMul;
         bool echo = p.EchoReady;
         if (echo) { mul *= 2f; p.EchoReady = false; }
-        int dmg = Math.Max(1, (int)MathF.Round(s.Damage * mul));
+        // round up once a relic raises damage, so a stack never vanishes on a light cut (3 * 1.15 still gives 4)
+        int dmg = Math.Max(1, mul > 1f ? (int)MathF.Ceiling(s.Damage * mul - 0.001f) : (int)MathF.Round(s.Damage * mul));
         int fracture = p.Weapon.FractureEveryHit ? Math.Max(1, s.Fracture) : s.Fracture;
         if (p.Has(RKind.Brasa) > 0) { e.Burn = Relics.BurnFrames * p.Has(RKind.Brasa); }
         Damage(e, dmg, dir, s.Knock, s.Poise, heavy ? 28f : 16f);
@@ -334,7 +348,7 @@ public sealed partial class World
         float scale = e.Boss ? 0.35f : 1f;
         e.Vel += dir * knock * (armoured ? 0.12f : 1f) * scale;
         if (!armoured) { e.State = EState.Stun; e.T = 0f; e.StunLen = stun; }
-        if (e.Hp <= 0) Kill(e);
+        if (e.Hp <= 0) Kill(e, byPlayer);
     }
 
     /// <summary>A hit the player made happen: grows the combo and wins back spin health.</summary>
@@ -360,11 +374,11 @@ public sealed partial class World
         Emit(Ev.Heal, p.Pos, amount);
     }
 
-    void Kill(Enemy e)
+    void Kill(Enemy e, bool byPlayer = true)
     {
         if (e.State == EState.Dead) return;
         e.State = EState.Dead;
-        HealPlayer(Player.Weapon.KillHeal + Relics.SedeHeal * Player.Has(RKind.Sede));
+        if (byPlayer) HealPlayer(Player.Weapon.KillHeal + Relics.SedeHeal * Player.Has(RKind.Sede)); // an enemy bomb or a wall does not feed you
         Emit(Ev.Kill, e.Pos, e.Radius, (int)e.Kind);
     }
 

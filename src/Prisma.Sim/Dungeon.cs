@@ -14,6 +14,8 @@ public sealed class RoomNode
     public EKind[][] Waves = [];
     public EKind[] Guardians = [];
     public bool Cleared, Seen;
+    /// <summary>Offers raised here and not yet taken: they wait on their altars if you leave and come back.</summary>
+    public Offer[]? Pending;
 }
 
 public static class Sides
@@ -233,6 +235,7 @@ public sealed partial class World
         {
             Phase = Phase.Explore;
             PortalOpen = node.Kind == RoomKind.Boss && Map.Floor < Dungeon.Floors - 1;
+            if (node.Pending != null) PlaceAltars(node.Pending);
         }
         else if (node.Kind == RoomKind.Start) { node.Cleared = true; Phase = Phase.Explore; }
         else if (node.Kind == RoomKind.Treasure) { node.Cleared = true; Phase = Phase.Explore; RaiseAltars(); }
@@ -338,7 +341,14 @@ public sealed partial class World
             offers.Add(new Offer(OfferKind.Relic, Relic: r));
         }
         if (Player.Hp < Player.MaxHp * 0.6f) offers[2] = new Offer(OfferKind.Heal);
-        for (int i = 0; i < 3; i++) Altars.Add(new Altar { Pos = AltarSpots[i], Offer = offers[i] });
+        Room.Pending = offers.ToArray();
+        PlaceAltars(Room.Pending);
+    }
+
+    void PlaceAltars(Offer[] offers)
+    {
+        Altars.Clear();
+        for (int i = 0; i < offers.Length; i++) Altars.Add(new Altar { Pos = AltarSpots[i], Offer = offers[i] });
         Emit(Ev.Altars, Vector2.Zero, 0f, Altars.Count);
     }
 
@@ -354,6 +364,7 @@ public sealed partial class World
             case OfferKind.Weapon:
                 p.Weapon = Weapon.Of(o.Weapon);
                 p.NextCombo = 0; p.ComboTimer = 0; p.EchoReady = false;
+                if (!p.HeavySwing) p.Combo = -1; // the swing in progress ends into the new sword's first cut
                 break;
             case OfferKind.Relic:
                 p.Relics[(int)o.Relic]++;
@@ -364,6 +375,7 @@ public sealed partial class World
                 break;
         }
         Altars.Clear();
+        if (Room != null) Room.Pending = null;
         Emit(Ev.Reward, pos, (int)o.Kind, i);
     }
 }
