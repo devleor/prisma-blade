@@ -42,3 +42,9 @@ de pedra vista inteira de cima; triângulos, círculos, hexágonos e um Monólit
 - `scripts/`: cena Godot, com desenho vetorial e glow HDR (`Main`), partículas (`Fx`), HUD, áudio (`Sfx`) e controles.
 - `assets/audio` e `assets/textures`: sons, músicas, texturas de pedra e partículas, todos CC0; a origem de cada um está em `docs/ASSET_SOURCES.md`.
 - `node tools/verify.mjs [--gpu]`: build, testes e GameCheck headless; com `--gpu`, também salva screenshots em `test-results/`.
+
+## Documentação
+
+- `docs/adr/`: registro de decisões (ADRs), espelhado no Obsidian em `Prisma Blade/Decisões`.
+- `docs/ART_STYLE.md`: estilo de arte e como cada coisa é desenhada.
+- `docs/ASSET_SOURCES.md`: origem e licença de todo som.
