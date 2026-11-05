@@ -1,4 +1,4 @@
-Required Notice: Copyright (c) 2026 Leozin (devleor) (https://github.com/devleor/prisma-blade)
+Required Notice: Copyright (c) 2026 Leonardo Rosa (https://github.com/devleor/prisma-blade)
 
 # PolyForm Noncommercial License 1.0.0
 
