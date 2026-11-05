@@ -122,3 +122,11 @@ A licença não dá nenhum direito comercial. Esses direitos continuam com o aut
 usado para identificar outros jogos. Sons e fontes de terceiros seguem as próprias licenças, listadas em
 `docs/ASSET_SOURCES.md`. Contribuições (pull requests) só são aceitas com um acordo à parte que permita ao autor usá-las
 também em uma versão comercial do jogo.
+
+---
+
+<p align="center">
+  <img src="docs/media/bandeira_br.gif" width="160" alt="Bandeira do Brasil em pixel art, desenhada com o Inkwake"><br>
+  <b>MADE BY BRAZILIAN ENGINEERS</b><br>
+  <sub>A bandeira foi desenhada pelo <a href="https://github.com/devleor/inkwake">Inkwake</a>, o gerador de efeitos pintados do mesmo autor.</sub>
+</p>
