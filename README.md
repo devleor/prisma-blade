@@ -111,3 +111,14 @@ godot --path . --audio-driver Dummy --resolution 1920x1080 --fixed-fps 60 --writ
 - `docs/adr/`: o registro de decisões (ADRs).
 - `docs/ART_STYLE.md`: o estilo de arte e como cada coisa é desenhada.
 - `docs/ASSET_SOURCES.md`: a origem e a licença de cada som e fonte.
+
+## Licença
+
+O código está aberto para estudo, mas **não é open source**: ele usa a
+[PolyForm Noncommercial 1.0.0](LICENSE.md). Você pode ler, estudar, modificar, usar e compartilhar para fins não comerciais
+(pessoais, de estudo, pesquisa ou de organizações sem fins lucrativos), mantendo a licença e o aviso de copyright. **Não é permitido** vender, lançar ou publicar o jogo (ou uma versão dele) com fins comerciais.
+
+A licença não dá nenhum direito comercial. Esses direitos continuam com o autor, e o nome "Prisma Blade" não pode ser
+usado para identificar outros jogos. Sons e fontes de terceiros seguem as próprias licenças, listadas em
+`docs/ASSET_SOURCES.md`. Contribuições (pull requests) só são aceitas com um acordo à parte que permita ao autor usá-las
+também em uma versão comercial do jogo.
